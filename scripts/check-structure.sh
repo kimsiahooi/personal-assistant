@@ -82,11 +82,14 @@ done < <(grep -rn -E '(DB::|->join\(|->leftJoin\(|selectRaw\(|whereRaw\()' app/H
 # Two stages rather than one regex, because the operator is rarely next to the field —
 # `rows.reduce((s, r) => s + Number(r.amount), 0)` is the shape this actually takes.
 # Stage one finds the money, stage two finds the arithmetic. Operators are matched
-# spaced or compound so that JSX `/>` and `</` are not arithmetic. Mark a deliberate
-# exception `money-allow`.
+# spaced or compound so that JSX `/>` and `</` are not arithmetic, and comment lines are
+# dropped first — a JSDoc continuation begins with ` * `, which is otherwise
+# indistinguishable from a spaced multiplication. Mark a deliberate exception
+# `money-allow`.
 while IFS= read -r hit; do
     fail "${hit%%:*}: money arithmetic in the browser — total it in SQL, or mark the line 'money-allow'."
 done < <(grep -rn -E '\.amount|\bamount\b' "$JS" 2>/dev/null \
+    | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(\*|//|/\*)' \
     | grep -E '[[:space:]][-+*/][[:space:]]|[-+*/]=|\breduce\(' \
     | grep -v 'money-allow')
 

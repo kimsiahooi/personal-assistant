@@ -82,7 +82,13 @@ if (!existsSync(COMMITTED)) {
 
 if (readFileSync(COMMITTED, 'utf8') !== fresh) {
     fail(
-        `${COMMITTED} does not match app/Data — run \`bun run types:generate\` and commit the result.\n` +
+        `${COMMITTED} does not match app/Data.\n` +
+            '  Fix: rm resources/js/types/typescript-transformer-manifest.json && bun run types:generate\n' +
+            '  The manifest is not optional in that command. The transformer keeps its state there\n' +
+            '  and skips writing when it believes nothing changed — so `types:generate` alone is a\n' +
+            '  no-op against a file that was edited by hand or truncated, and leaves this gate failing\n' +
+            '  with no visible reason. Verified: appending one line to generated.d.ts survives a plain\n' +
+            '  regeneration and disappears once the manifest is removed.\n' +
             '  (If you edited it by hand: that file is generated, so the change belongs in the Data class.)',
     );
 }

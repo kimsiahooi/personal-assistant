@@ -133,8 +133,24 @@ for (const { name: request, path: source } of requests) {
         schema = schema(...(FACTORY_ARGS[request] ?? []));
     }
 
+    const declared = laravelFields(source);
+
+    // A request that yields no fields is the gate's own failure mode, not a clean pass.
+    // `laravelFields` matches twelve spaces of indentation; a `rules()` formatted any
+    // other way returns nothing, and every check below then trivially succeeds. This was
+    // reproduced deliberately — re-indenting one rules() made the gate report three
+    // agreeing pairs while reading zero fields — so it fails loudly instead.
+    if (declared.length === 0) {
+        problems.push(
+            `${request}: no rules were read from ${request}.php. \`rules()\` must return an ` +
+                'inline array literal at twelve spaces of indentation — a spread or a different ' +
+                'format parses as zero fields, and this gate would then pass while checking nothing.',
+        );
+        continue;
+    }
+
     const known = zodFields(schema);
-    const missing = laravelFields(source).filter((f) => !known.includes(f));
+    const missing = declared.filter((f) => !known.includes(f));
 
     if (missing.length > 0) {
         problems.push(

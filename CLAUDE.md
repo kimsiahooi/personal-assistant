@@ -44,6 +44,34 @@ render output. Compute in `useEffect` or pin the locale. A nondeterministic rend
 React #418 hydration mismatch that nothing but your own eyes will catch.
 `scripts/ui-guard.sh` blocks the two easy cases.
 
+## Dates — a UTC instant standing for a local day
+
+`transactions.occurred_at` is a **UTC timestamp**, like every other datetime here. It
+holds the instant a local calendar day began: picking 2 September in Malaysia stores
+`2026-09-01T16:00:00Z`.
+
+That only stays coherent because the conversion is not optional at any boundary, and
+**`App\Support\LocalDate` owns all of it** — a picked date becomes an instant on write, a
+filter's local range becomes a UTC window, a monthly total is bounded by the LOCAL month,
+and a row is read back as the day the viewer would call it. Never call `->toDateString()`
+on the raw column: that reports the UTC day, which is the previous one for anything
+recorded before 08:00 in Malaysia.
+
+The failure this exists to avoid, verified rather than assumed: a transaction on the 1st
+of a month is the previous month in UTC, so a naive `GROUP BY` moves it — and the totals
+it moves between are the two numbers on the dashboard people actually read.
+
+The zone is a **server value**. `App\Support\TimeZones` reads it from a cookie the
+browser writes before first paint; `HandleInertiaRequests` shares it. Never
+`Intl.DateTimeFormat().resolvedOptions()` during a render: the SSR pass and the browser
+would disagree, and at 09:00 in Kuala Lumpur the server's own UTC clock still says
+yesterday.
+
+Monthly aggregates run one bounded query per month rather than a `GROUP BY`. `CONVERT_TZ`
+needs MySQL's timezone tables loaded (they usually are not) and a fixed offset is wrong
+across a daylight-saving boundary; six bounded queries over an indexed column are cheap
+and cannot be wrong.
+
 ## Money — the rule the app is built around
 
 Amounts are `decimal(15,2)` in MySQL, cast `decimal:2`, and exposed through the DTO as

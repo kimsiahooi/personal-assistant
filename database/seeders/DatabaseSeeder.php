@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\AccountType;
+use App\Enums\CategoryKind;
+use App\Models\Account;
+use App\Models\Category;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -54,5 +58,48 @@ class DatabaseSeeder extends Seeder
         $this->command->info($user->wasRecentlyCreated
             ? "Created the owner account for {$email}."
             : "Owner account for {$email} already exists — left untouched.");
+
+        $this->seedStarterData($user);
+    }
+
+    /**
+     * A starting set of accounts and categories, so the first screen is not empty.
+     *
+     * `firstOrCreate` on the natural key, so re-seeding never duplicates and never
+     * overwrites something the user has since renamed. Amounts stay at zero: a fabricated
+     * opening balance would show up in the net-worth figure as money that does not exist.
+     */
+    private function seedStarterData(User $user): void
+    {
+        $accounts = [
+            ['name' => 'Cash', 'type' => AccountType::Cash],
+            ['name' => 'Bank', 'type' => AccountType::Bank],
+        ];
+
+        foreach ($accounts as $account) {
+            Account::firstOrCreate(
+                ['user_id' => $user->id, 'name' => $account['name']],
+                ['type' => $account['type'], 'opening_balance' => '0.00'],
+            );
+        }
+
+        $categories = [
+            [CategoryKind::Income, 'Salary', 'chart-1', 'banknote'],
+            [CategoryKind::Income, 'Other income', 'chart-2', 'circle-plus'],
+            [CategoryKind::Expense, 'Food', 'chart-1', 'utensils'],
+            [CategoryKind::Expense, 'Transport', 'chart-2', 'car'],
+            [CategoryKind::Expense, 'Bills', 'chart-3', 'receipt'],
+            [CategoryKind::Expense, 'Shopping', 'chart-4', 'shopping-bag'],
+            [CategoryKind::Expense, 'Other', 'chart-5', 'ellipsis'],
+        ];
+
+        foreach ($categories as [$kind, $name, $colour, $icon]) {
+            Category::firstOrCreate(
+                ['user_id' => $user->id, 'kind' => $kind, 'name' => $name],
+                ['colour' => $colour, 'icon' => $icon],
+            );
+        }
+
+        $this->command->info('Starter accounts and categories are in place.');
     }
 }
