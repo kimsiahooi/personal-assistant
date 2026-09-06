@@ -29,6 +29,19 @@
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
 
+    /* Link text.
+     *
+     * Deliberately NOT `primary`. That is a SURFACE colour: it is contrast-checked
+     * against `primary-foreground` sitting on top of it, never against the page behind
+     * it — and in dark mode it is DARKER than its light counterpart (0.424 vs 0.488),
+     * because a button wants to recede there. As text on a 0.145 background that is
+     * around 2.8:1, well under the 4.5:1 a body-sized link needs.
+     *
+     * Same hue, lightness chosen per theme against the background it actually sits on.
+     */
+    --color-link: var(--link);
+    --color-link-hover: var(--link-hover);
+
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
 
@@ -64,72 +77,120 @@
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
+    --link: oklch(0.488 0.243 264.376);
+    --link-hover: oklch(0.38 0.222 264.376);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
+    --primary: oklch(0.488 0.243 264.376);
+    --primary-foreground: oklch(0.97 0.014 254.604);
+    --secondary: oklch(0.967 0.001 286.375);
+    --secondary-foreground: oklch(0.21 0.006 285.885);
     --muted: oklch(0.97 0 0);
     --muted-foreground: oklch(0.556 0 0);
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
+    /* Two roles, deliberately separate — see the dark block for why it matters:
+       --destructive is the SOLID SURFACE a destructive button fills with, and
+       --destructive-foreground is destructive TEXT on an ordinary surface
+       (`ui/alert`, `ui/dropdown-menu`, a ghost icon button).
+       In light mode one value serves both: white on it reads at 4.77:1, and it on
+       white reads at 4.77:1. */
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.577 0.245 27.325);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.87 0 0);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --radius: 0.625rem;
+    --ring: oklch(0.708 0 0);
+    /* A qualitative palette: five hues meant to be told apart at a glance, not five
+       steps of one ramp. shadcn ships five greys here — a `baseColor: neutral` default
+       nobody customised — which cannot do the job the tokens exist for.
+
+       Anchored on the brand blue and spaced around the wheel from it. Every slot was
+       run through a validator rather than eyeballed, and clears, against #ffffff: the
+       lightness band, the chroma floor (nothing reads grey), 3:1 contrast, and the
+       colour-vision-deficiency floor on adjacent pairs — worst is raspberry↔bronze at
+       ΔE 8.7 deutan.
+
+       laravel-ms-ai-v2's own five fail three of those: its teal reads grey at chroma
+       0.081, and its green↔bronze pair is ΔE 5.1 for a protan reader. Same intent,
+       measured instead of judged.
+
+       No five-hue set clears the floor across ALL pairs rather than adjacent ones —
+       the skill's own reference palette does not either — so every chart carries a
+       legend and direct labels, and identity is never colour alone.
+
+       Assign in order; never cycle. A sixth series folds into "Other". */
+    --chart-1: oklch(0.5 0.19 264); /* blue      #2858CD */
+    --chart-2: oklch(0.553 0.174 38.402); /* orange    #C2410C */
+    --chart-3: oklch(0.6 0.104 184.704); /* teal      #0D9488 */
+    --chart-4: oklch(0.554 0.121 66.442); /* bronze    #A16207 */
+    --chart-5: oklch(0.525 0.199 3.958); /* raspberry #BE185D */
+    --radius: 0;
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.546 0.245 262.881);
+    --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
     --sidebar-accent: oklch(0.97 0 0);
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.87 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
 }
 
 .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.145 0 0);
+    --link: oklch(0.78 0.132 264.376);
+    --link-hover: oklch(0.87 0.09 264.376);
+    --card: oklch(0.205 0 0);
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.145 0 0);
+    --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
+    --primary: oklch(0.424 0.199 265.638);
+    --primary-foreground: oklch(0.97 0.014 254.604);
+    --secondary: oklch(0.274 0.006 286.033);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
     --muted-foreground: oklch(0.708 0 0);
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.396 0.141 25.723);
-    --destructive-foreground: oklch(0.637 0.237 25.331);
-    --border: oklch(0.269 0 0);
-    --input: oklch(0.269 0 0);
-    --ring: oklch(0.439 0 0);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
+    /* One value, two jobs — which works here only because of where the knock-back
+       lives. The components vendored from the registry read `--destructive` for both
+       `bg-destructive` (the solid button) and `text-destructive` (red label, icon,
+       menu item), and the button recipe carries `dark:bg-destructive/60`. So the
+       surface is this light red at 60% over the card — #A24547, white on it 6.03:1 —
+       while the text is the same red at full strength on the card, 6.19:1. Both AA.
+
+       laravel-ms-ai-v2 sets 0.505 here instead. Its button.tsx predates that class
+       and renders the token raw, so the palette had to do the darkening. Ours must
+       not: 0.505 knocked back again lands on a muddy #693132.
+
+       --destructive-foreground is unused by these components (they say
+       `text-destructive`), and is kept for the ones ported from laravel-ms-ai-v2 in
+       Phase 6, which say `text-destructive-foreground`. It holds the light red, which
+       is what destructive text on a dark ground needs. */
+    --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    /* Re-stepped for the dark card, not flipped from light: same five hues, chosen
+       against #171717 and re-validated there. Clears the dark lightness band, the
+       chroma floor, 3:1 contrast, and adjacent-pair CVD (worst teal↔orange ΔE 11.9
+       protan). */
+    --chart-1: oklch(0.63 0.16 264); /* blue      #5684E9 */
+    --chart-2: oklch(0.67 0.157 44.077); /* orange    #E2703A */
+    --chart-3: oklch(0.655 0.12 174.69); /* teal      #17A88C */
+    --chart-4: oklch(0.667 0.137 81.769); /* bronze    #BE8A00 */
+    --chart-5: oklch(0.661 0.165 1.152); /* raspberry #E0608C */
     --sidebar: oklch(0.205 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.985 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.623 0.214 259.815);
+    --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
     --sidebar-accent: oklch(0.269 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.269 0 0);
-    --sidebar-ring: oklch(0.439 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {
@@ -139,5 +200,14 @@
 
     body {
         @apply bg-background text-foreground;
+    }
+
+    /* Chrome draws its own clear button inside every input[type="search"], and every
+       search box in this app already renders one of its own — so the box showed two.
+       The app's is the one that stays: it is keyboard-reachable, it carries a
+       translated label, and it clears the request rather than only the field. */
+    input[type='search']::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+        appearance: none;
     }
 }
