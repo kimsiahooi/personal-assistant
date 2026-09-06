@@ -9,9 +9,13 @@ use App\Enums\CategoryKind;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\User;
+use App\Providers\AppServiceProvider;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
+use RuntimeException;
 
 class DatabaseSeeder extends Seeder
 {
@@ -26,8 +30,10 @@ class DatabaseSeeder extends Seeder
      * this file is committed, and a password in version control outlives every
      * rotation.
      *
-     * `firstOrCreate` keys on the email, so a re-seed after adding demo data leaves the
-     * existing account — and its password — alone.
+     * The account is looked up before it is created, rather than going through
+     * `firstOrCreate`, so that {@see self::ownerPassword()} is consulted only when a
+     * password is actually about to be written. Re-seeding a live box to pick up new
+     * starter data then does not demand SEED_USER_PASSWORD be put back into `.env`.
      */
     public function run(): void
     {
@@ -41,25 +47,78 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        $name = config('owner.name');
-        $password = config('owner.password');
+        $user = User::firstWhere('email', $email);
 
-        $user = User::firstOrCreate(
-            ['email' => $email],
-            [
+        if ($user === null) {
+            $name = config('owner.name');
+
+            $user = User::create([
                 'name' => is_string($name) && $name !== '' ? $name : 'Owner',
-                'password' => Hash::make(
-                    is_string($password) && $password !== '' ? $password : 'password',
-                ),
-                'email_verified_at' => now(),
-            ],
-        );
+                'email' => $email,
+                'password' => Hash::make($this->ownerPassword()),
+            ]);
 
-        $this->command->info($user->wasRecentlyCreated
-            ? "Created the owner account for {$email}."
-            : "Owner account for {$email} already exists — left untouched.");
+            // `forceFill`, because `email_verified_at` is not in User's #[Fillable] —
+            // passing it to create() looks like it works and is silently discarded,
+            // which is what this seeder used to do. Nothing reads the column today
+            // (verification is disabled and User does not implement MustVerifyEmail),
+            // but it is stamped anyway: the day verification is switched back on, the
+            // owner would be sent a verification email and MAIL_MAILER has nowhere to
+            // deliver one.
+            $user->forceFill(['email_verified_at' => now()])->save();
+
+            $this->command->info("Created the owner account for {$email}.");
+        } else {
+            $this->command->info(
+                "Owner account for {$email} already exists — left untouched.",
+            );
+        }
 
         $this->seedStarterData($user);
+    }
+
+    /**
+     * The password for a brand-new owner account — refused, never weakened, in production.
+     *
+     * Outside production an unset SEED_USER_PASSWORD falls back to `password`, which is
+     * what makes a fresh clone usable in one command. In production that same fallback
+     * would put a publicly-known password on a public URL, print "Created the owner
+     * account" as though nothing were wrong, and — because registration is disabled —
+     * leave nobody with a reason to look. Being the only door in is exactly why this one
+     * cannot be left unlocked.
+     *
+     * Validated against `Password::defaults()` rather than a rule list written here, so
+     * the owner is held to the same bar as every password the app accepts through a form:
+     * in production 12 characters, mixed case, a number, a symbol, and not found in a
+     * known breach (see {@see AppServiceProvider}). One definition, so
+     * the two cannot drift apart.
+     *
+     * Throws rather than warns. `db:seed --force` runs unattended, and a warning on the
+     * stdout of a deploy is a warning nobody reads.
+     */
+    private function ownerPassword(): string
+    {
+        $configured = config('owner.password');
+        $password = is_string($configured) ? $configured : '';
+
+        if (! app()->isProduction()) {
+            return $password !== '' ? $password : 'password';
+        }
+
+        $validator = Validator::make(
+            ['password' => $password],
+            ['password' => ['required', 'string', Password::defaults()]],
+        );
+
+        if ($validator->fails()) {
+            throw new RuntimeException(
+                'SEED_USER_PASSWORD is not usable in production: '
+                .implode(' ', $validator->errors()->all())
+                .' Nothing was created — set it in .env and run the seeder again.',
+            );
+        }
+
+        return $password;
     }
 
     /**

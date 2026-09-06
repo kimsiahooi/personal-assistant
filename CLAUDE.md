@@ -134,6 +134,25 @@ signal (~250-line pages, ~30-line controller methods), one-way dependencies
 component out of its module, and business logic never in a page or a controller.
 `scripts/check-structure.sh` enforces the mechanical parts.
 
+## Deployment — and the one number that must not be tidied away
+
+`bun run deploy` is the whole release process; the runbook is
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). One thing belongs here because it looks like
+cruft and is not:
+
+**The Inertia SSR port is pinned to 13715, in `vite.config.ts` and `config/inertia.php`,
+and the two must agree.** 13714 is Inertia's default and the production box already runs
+another Laravel app on it. Two SSR processes cannot share a port: the loser dies with
+`EADDRINUSE`, and its Laravel keeps posting to that port and reaches the *other* app's
+render server — which, both apps being the same starter kit, can actually resolve
+`dashboard` and `auth/login`. Whichever starts first wins, so a reboot decides which app
+loses server rendering, and nothing is logged either way.
+
+`host: '127.0.0.1'` on the same option is load-bearing too: the plugin's default is
+`0.0.0.0`, which would expose an unauthenticated render endpoint publicly.
+
+Do not restore either to its default, and do not change one file without the other.
+
 ## No i18n
 
 English only. There is no `lang/`, no `t()`, no `useTranslation`. When porting a component
