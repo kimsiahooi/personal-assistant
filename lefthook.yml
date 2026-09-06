@@ -1,0 +1,42 @@
+# Git hooks — the project's enforcement gate. This repo has NO test suite by design,
+# so these static checks are the entire automated safety net. They are all fast and
+# single-shot; nothing here spins a watcher or a test runner.
+#
+#   pre-commit — near-instant: format/lint/type-check + the UI and structure guards.
+#   pre-push   — seconds: PHPStan, zod↔Laravel validation parity, generated types,
+#                production build.
+#
+# Installed by `bun run prepare` (lefthook install); run `bunx lefthook install` after
+# cloning if hooks aren't active. Skip once with `LEFTHOOK=0 git commit …` in a pinch.
+
+pre-commit:
+  parallel: false
+  commands:
+    pint:
+      glob: "*.php"
+      run: vendor/bin/pint {staged_files}
+      stage_fixed: true
+    biome:
+      glob: "*.{js,ts,tsx,jsx,json,jsonc}"
+      run: bunx biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+    types:
+      glob: "*.{ts,tsx}"
+      run: bun run types:check
+    ui-guard:
+      run: bash scripts/ui-guard.sh
+    structure:
+      run: bash scripts/check-structure.sh
+
+pre-push:
+  parallel: false
+  commands:
+    phpstan:
+      glob: "*.php"
+      run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+    validation-parity:
+      run: bun run check:validation
+    generated-types:
+      run: bun run check:generated-types
+    build:
+      run: bun run build

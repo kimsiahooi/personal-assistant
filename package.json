@@ -12,7 +12,12 @@
         "lint:check": "biome lint .",
         "check": "biome check --write .",
         "check:ci": "biome check .",
-        "types:check": "tsc --noEmit"
+        "check:generated-types": "bun run scripts/check-generated-types.ts",
+        "check:structure": "bash scripts/check-structure.sh",
+        "check:validation": "bun run scripts/check-validation-parity.ts",
+        "types:check": "tsc --noEmit",
+        "types:generate": "php artisan typescript:transform",
+        "prepare": "lefthook install"
     },
     "devDependencies": {
         "@biomejs/biome": "2.5.2",
