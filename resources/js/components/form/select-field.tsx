@@ -132,6 +132,10 @@ export function SelectField({
             <Select value={value} onValueChange={change}>
                 <SelectTrigger
                     id={id}
+                    // The element carrying this field's `name` is the hidden input below,
+                    // which cannot be focused. `data-field` tells the zod gate which
+                    // control to put the cursor on instead — see `focusFirstInvalid`.
+                    data-field={name}
                     className="w-full"
                     aria-invalid={!!error}
                     aria-describedby={describedBy}

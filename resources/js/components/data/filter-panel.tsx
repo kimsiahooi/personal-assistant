@@ -1,6 +1,6 @@
 import { SlidersHorizontal } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,17 +48,40 @@ export function FilterPanel({
     const isMobile = useIsMobile();
     const [open, setOpen] = useState(false);
 
-    const trigger = (
-        <Button variant="outline" size="sm" className="w-full sm:w-auto">
+    // The one-click Clear beside the trigger renders only while a filter is in force, so
+    // pressing it removes the button under the cursor. The trigger is right next to it and
+    // always present, which makes it the natural place for focus to land.
+    const trigger = useRef<HTMLButtonElement>(null);
+
+    const triggerButton = (
+        <Button
+            ref={trigger}
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+        >
             <SlidersHorizontal className="size-4" />
             Filters
             {filter.count > 0 && (
-                <Badge
-                    variant="secondary"
-                    className="ml-1 h-5 min-w-5 justify-center px-1 tabular-nums"
-                >
-                    {filter.count}
-                </Badge>
+                <>
+                    <Badge
+                        variant="secondary"
+                        aria-hidden
+                        className="ml-1 h-5 min-w-5 justify-center px-1 tabular-nums"
+                    >
+                        {filter.count}
+                    </Badge>
+                    {/*
+                        The badge alone made the button announce as "Filters 2", which reads
+                        as an ordinal — the second filter button — rather than a count of
+                        what is in force. Same treatment as the Columns panel.
+                    */}
+                    <span className="sr-only">
+                        {filter.count === 1
+                            ? '1 filter applied'
+                            : `${filter.count} filters applied`}
+                    </span>
+                </>
             )}
         </Button>
     );
@@ -91,7 +114,7 @@ export function FilterPanel({
         <div className="flex w-full items-center gap-2 sm:w-auto">
             {isMobile ? (
                 <Sheet open={open} onOpenChange={setOpen}>
-                    <SheetTrigger asChild>{trigger}</SheetTrigger>
+                    <SheetTrigger asChild>{triggerButton}</SheetTrigger>
                     <SheetContent side="bottom" className="max-h-[80dvh]">
                         <SheetHeader>
                             <SheetTitle>Filters</SheetTitle>
@@ -104,7 +127,7 @@ export function FilterPanel({
                 </Sheet>
             ) : (
                 <Popover open={open} onOpenChange={setOpen}>
-                    <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+                    <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
                     <PopoverContent
                         align="end"
                         // Tall enough for four controls, and scrolls past that rather than
@@ -126,7 +149,10 @@ export function FilterPanel({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={filter.clear}
+                    onClick={() => {
+                        trigger.current?.focus();
+                        filter.clear();
+                    }}
                 >
                     Clear
                 </Button>

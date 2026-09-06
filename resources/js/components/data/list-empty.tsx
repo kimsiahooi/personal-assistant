@@ -27,6 +27,7 @@ export function ListEmpty({
     total,
     emptyState,
     onClearSearch,
+    onClearFilters,
     onFirstPage,
 }: {
     /** What the server searched for — not what is currently typed. */
@@ -38,7 +39,13 @@ export function ListEmpty({
     total: number;
     /** Shown when the resource is genuinely empty. */
     emptyState: ReactNode;
+    /**
+     * Both clears are handed in rather than calling `filter.clear()` directly, because
+     * activating either unmounts this whole component — so something that survives has to
+     * take the cursor. {@link DataTable} owns that decision; see its `searchInput`.
+     */
     onClearSearch: () => void;
+    onClearFilters: () => void;
     onFirstPage: () => void;
 }) {
     const searching = search !== '';
@@ -74,7 +81,7 @@ export function ListEmpty({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={filter.clear}
+                                    onClick={onClearFilters}
                                 >
                                     Clear filters
                                 </Button>

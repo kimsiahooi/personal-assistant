@@ -93,7 +93,20 @@ export function runGate(
     return false;
 }
 
-/** Put the cursor on the first thing that needs fixing. */
+/**
+ * Put the cursor on the first thing that needs fixing.
+ *
+ * **Not every field's `name` is on something you can focus.** `SelectField` and
+ * `CheckboxField` submit through a hidden input — the visible control is Radix's, and the
+ * wire value is ours — so `[name="kind"]` resolves to `input[type=hidden]` and
+ * `.focus()` on it is a silent no-op. The cursor then stayed on the submit button while
+ * the message rendered in the dialog's separately-scrolled field region, which on a tall
+ * form can be entirely off-screen. Those components carry `data-field` on the control a
+ * person actually reaches, and that is tried first.
+ *
+ * Hidden inputs are skipped rather than merely deprioritised, so a field that grows a
+ * hidden input later cannot quietly reintroduce the same silence.
+ */
 function focusFirstInvalid(errors: ErrorBag): void {
     const [first] = Object.keys(errors);
 
@@ -106,9 +119,23 @@ function focusFirstInvalid(errors: ErrorBag): void {
             ? CSS.escape(value)
             : value.replace(/["\\]/g, '\\$&');
 
-    const field = document.querySelector<HTMLElement>(
-        `[name="${forSelector(dotPathToInputName(first))}"], #${forSelector(first)}`,
+    const candidates = document.querySelectorAll<HTMLElement>(
+        `[data-field="${forSelector(first)}"], ` +
+            `[name="${forSelector(dotPathToInputName(first))}"], ` +
+            `#${forSelector(first)}`,
     );
 
-    field?.focus();
+    for (const field of candidates) {
+        if (field instanceof HTMLInputElement && field.type === 'hidden') {
+            continue;
+        }
+
+        field.focus();
+        // The dialog gives its fields their own overflow container, and focusing a control
+        // already inside the viewport does not scroll that container — so a message below
+        // the fold stays there. `nearest` moves only when it has to.
+        field.scrollIntoView?.({ block: 'nearest' });
+
+        return;
+    }
 }

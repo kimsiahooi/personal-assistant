@@ -83,14 +83,28 @@ done < <(grep -rn -E '(DB::|->join\(|->leftJoin\(|selectRaw\(|whereRaw\()' app/H
 #
 # Two stages rather than one regex, because the operator is rarely next to the field —
 # `rows.reduce((s, r) => s + Number(r.amount), 0)` is the shape this actually takes.
+# Stage one names every identifier money travels under; naming only `amount` left the
+# accounts list's `balance` and `movement` unguarded for a whole phase.
 # Stage one finds the money, stage two finds the arithmetic. Operators are matched
 # spaced or compound so that JSX `/>` and `</` are not arithmetic, and comment lines are
 # dropped first — a JSDoc continuation begins with ` * `, which is otherwise
 # indistinguishable from a spaced multiplication. Mark a deliberate exception
 # `money-allow`.
+# Every identifier money travels under, not just `amount`. The rule was written when the
+# ledger was the only screen and `amount` was the only name; `balance`, `movement` and
+# `opening_balance` arrived with the accounts list, and a `reduce` over any of them is the
+# same float drift under a different word.
+#
+# Bare `total` is deliberately NOT here, and `_total` is. In this codebase `total` already
+# means a ROW COUNT — `page.total`, and ListEmpty's — so matching it fires on
+# `index === total - 1` in the Columns panel, which is not money and never will be. A gate
+# that cries wolf is a gate people silence with `money-allow`, and the next real finding
+# goes with it. The dashboard's money fields are therefore named `<thing>_total`, which
+# this catches and a row count never collides with.
+money_re='\bamounts?\b|\bbalances?\b|\bmagnitude\b|\bmovement\b|\bopening_balance\b|\bsubtotals?\b|_totals?\b|\bnet\b'
 while IFS= read -r hit; do
     fail "${hit%%:*}: money arithmetic in the browser — total it in SQL, or mark the line 'money-allow'."
-done < <(grep -rn -E '\.amount|\bamount\b' "$JS" 2>/dev/null \
+done < <(grep -rn -E "$money_re" "$JS" 2>/dev/null \
     | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(\*|//|/\*)' \
     | grep -E '[[:space:]][-+*/][[:space:]]|[-+*/]=|\breduce\(' \
     | grep -v 'money-allow')

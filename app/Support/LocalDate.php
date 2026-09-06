@@ -64,8 +64,34 @@ final class LocalDate
     {
         return [
             self::toUtc($from, $timezone),
-            self::toUtc($to, $timezone)->addDay(),
+            // The day is added in the LOCAL calendar and only then converted, not added to
+            // an instant already in UTC. `toUtc()` returns a Carbon switched to UTC, so
+            // `->addDay()` on it is a flat +24h — which is not the start of the next local
+            // day on either side of a daylight-saving change. Spring forward and the window
+            // runs an hour into the following day; fall back and it stops an hour short,
+            // losing every transaction recorded in that hour. Malaysia has no DST, so this
+            // is correct-by-luck here and wrong the moment anyone travels.
+            self::endOfDay($to, $timezone),
         ];
+    }
+
+    /**
+     * The exclusive upper bound for a local range ending on `$date`: the UTC instant at
+     * which the following local day begins.
+     *
+     * Public because a controller may bound one end of a range without the other — an
+     * open-ended "everything up to here" — and doing it by hand is how the `->addDay()`
+     * described above gets copied out of this file.
+     */
+    public static function endOfDay(string $date, string $timezone): Carbon
+    {
+        return self::toUtc(self::nextDay($date), $timezone);
+    }
+
+    /** The calendar day after `$date`, as `Y-m-d`. No zone: this is date arithmetic. */
+    private static function nextDay(string $date): string
+    {
+        return Carbon::createFromFormat('Y-m-d', $date, 'UTC')->addDay()->toDateString();
     }
 
     /**

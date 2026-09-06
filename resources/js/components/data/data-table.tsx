@@ -9,7 +9,7 @@ import type {
 } from '@tanstack/react-table';
 import { useTable } from '@tanstack/react-table';
 import type { ReactNode } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ColumnHead } from '@/components/data/column-head';
 import {
     type ColumnLayout,
@@ -127,6 +127,17 @@ export function DataTable<TRow extends RowData>({
     const [layout, setLayout] = useState<ColumnLayout>(() =>
         defaultLayout(columns),
     );
+
+    /**
+     * The search box, so a control that removes itself can hand the cursor back.
+     *
+     * "Clear search" appears only while there is a term and "Clear filters" only while
+     * there is a filter, so pressing either unmounts the button under the cursor —
+     * dropping focus to `<body>` and restarting the next Tab at the top of the page. The
+     * input is the one thing on screen that survives both, and it is where somebody who
+     * just cleared a search wants to be anyway.
+     */
+    const searchInput = useRef<HTMLInputElement>(null);
 
     const configurable = useMemo(() => configurableColumns(columns), [columns]);
 
@@ -295,6 +306,7 @@ export function DataTable<TRow extends RowData>({
                     search={filters.search}
                     placeholder={searchPlaceholder}
                     onSearch={onSearch}
+                    inputRef={searchInput}
                     extra={toolbar?.(filter)}
                     columns={
                         // One configurable column is not a choice — there is nothing to
@@ -369,7 +381,14 @@ export function DataTable<TRow extends RowData>({
                     filter={filter}
                     total={page.total}
                     emptyState={emptyState}
-                    onClearSearch={() => onSearch('')}
+                    onClearSearch={() => {
+                        searchInput.current?.focus();
+                        onSearch('');
+                    }}
+                    onClearFilters={() => {
+                        searchInput.current?.focus();
+                        filter.clear();
+                    }}
                     onFirstPage={() => onPage(1)}
                 />
             )}

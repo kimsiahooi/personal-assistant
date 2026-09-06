@@ -30,9 +30,9 @@ final class AccountController
 
         $list = $this->resourceList(
             request: $request,
-            query: Account::query()
-                ->when(! $showArchived, fn ($query) => $query->active())
-                ->withSum('transactions as movement', 'amount'),
+            query: $this->balances->attach(
+                Account::query()->when(! $showArchived, fn ($query) => $query->active()),
+            ),
             sortable: ['name', 'type', 'created_at'],
             search: static function (Builder $query, string $term): void {
                 $query->where('name', 'like', "%{$term}%");
@@ -80,7 +80,13 @@ final class AccountController
      */
     public function destroy(Account $account): RedirectResponse
     {
-        if ($account->transactions()->exists()) {
+        // `withTrashed()` is the whole point: Transaction soft-deletes, so the plain
+        // relation query carries `deleted_at is null` and cannot see a row the database
+        // still very much can. `accounts` does NOT soft-delete, so `$account->delete()` is a
+        // real DELETE, and `restrictOnDelete` on the foreign key counts trashed rows —
+        // meaning this guard passed and the delete then threw a 500 for exactly the case
+        // the guard exists to explain.
+        if ($account->transactions()->withTrashed()->exists()) {
             $this->toast(
                 "{$account->name} has transactions. Archive it instead of deleting it.",
                 'error',

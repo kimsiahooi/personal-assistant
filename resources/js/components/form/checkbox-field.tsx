@@ -45,6 +45,9 @@ export function CheckboxField({
             <div className="flex items-start gap-3">
                 <Checkbox
                     id={id}
+                    // See SelectField: the name lives on the hidden input, so the gate
+                    // needs telling which control is the focusable one.
+                    data-field={name}
                     checked={checked}
                     onCheckedChange={(next) => setChecked(next === true)}
                     aria-invalid={!!error}

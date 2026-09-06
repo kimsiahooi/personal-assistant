@@ -50,7 +50,12 @@ const EXEMPT = new Set([
  * Empty until the first such schema exists; a stale entry here is inert (the map is
  * keyed by request class name) but misleading, so keep it to what the app has.
  */
-const FACTORY_ARGS: Record<string, unknown[]> = {};
+const FACTORY_ARGS: Record<string, unknown[]> = {
+    // `transactionSchema(today)` — the `before_or_equal` bound is the viewer's own today,
+    // which only the server knows. Any valid `Y-m-d` builds an inspectable schema; this
+    // gate reads field NAMES, never values.
+    TransactionRequest: ['2026-01-01'],
+};
 
 /** `StoreAccountRequest` → `store-account`. */
 function schemaModule(request: string): string {
@@ -60,10 +65,33 @@ function schemaModule(request: string): string {
         .toLowerCase();
 }
 
-/** The top-level field names a FormRequest's `rules()` returns. */
+/**
+ * The top-level field names a FormRequest's `rules()` returns.
+ *
+ * **Bounded to the `return [ … ];` inside `rules()`, not "everything after it".** Slicing
+ * to end-of-file and harvesting every twelve-space key was close enough while `rules()`
+ * was the last method in the class, and stopped being so the moment one gained an
+ * `attributes()` — whose array literal sits at exactly the same indent, so its keys were
+ * read as rules. That made the gate report fields the browser was not asked to check, and
+ * worse, it defeated the zero-fields guard: a `rules()` this parser could not read still
+ * looked non-empty because the method below it filled the gap.
+ */
 function laravelFields(path: string): string[] {
     const php = readFileSync(path, 'utf8');
-    const body = php.slice(php.indexOf('public function rules'));
+    const start = php.indexOf('public function rules');
+
+    if (start === -1) {
+        return [];
+    }
+
+    // From the `return [` that opens the literal to the `];` that closes it. Both are
+    // anchored to their own indentation, which is what keeps a nested array — `$this->
+    // moneyRules()` returns one — from ending the slice early.
+    const after = php.slice(start);
+    const open = after.indexOf('return [');
+    const close = after.indexOf('\n        ];');
+    const body = open === -1 || close === -1 ? '' : after.slice(open, close);
+
     const keys = [...body.matchAll(/^\s{12}'([^']+)'\s*=>/gm)].map((m) => m[1]);
 
     // `items.*.quantity` is part of `items`, which is already its own key.

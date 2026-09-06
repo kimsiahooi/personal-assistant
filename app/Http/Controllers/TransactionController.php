@@ -54,7 +54,7 @@ final class TransactionController
         // half-open — the start of the day *after* `$to` — because the alternative needs a
         // "last representable instant", and `23:59:59` silently drops the final second.
         $fromUtc = $from === null ? null : LocalDate::toUtc($from, $timezone);
-        $toUtc = $to === null ? null : LocalDate::toUtc($to, $timezone)->addDay();
+        $toUtc = $to === null ? null : LocalDate::endOfDay($to, $timezone);
 
         $query = Transaction::query()
             ->with(['account:id,name', 'category:id,name,colour,icon'])
@@ -135,17 +135,33 @@ final class TransactionController
         return back();
     }
 
+    /**
+     * Editing a transaction, including into or out of being a transfer.
+     *
+     * **The three cases are spelled out rather than collapsed**, because collapsing them is
+     * what broke this. The old condition was `isTransfer() || $transaction->isTransfer()`
+     * with a `$data['to_account_id'] ?? $data['account_id']` fallback — so changing an
+     * existing transfer to an expense entered the transfer branch (the row *was* one), found
+     * no destination on the wire (the field is unmounted for a non-transfer, and
+     * `Rule::requiredIf` therefore does not demand it), and fell back to the source account.
+     * That wrote a same-account transfer pair — the one shape both validation layers
+     * explicitly forbid — reached by a path that never asked either of them. The entry was
+     * destroyed and the money moved.
+     *
+     * With the cases separate, the destination is read only where it is guaranteed present,
+     * and the fallback that caused it is gone rather than made safer.
+     */
     public function update(TransactionRequest $request, Transaction $transaction): RedirectResponse
     {
         $data = $request->validated();
 
-        // A transfer is a pair, so editing one is replacing both — and changing a row
-        // between transfer and not means the pair has to be unmade or made.
-        if ($request->isTransfer() || $transaction->isTransfer()) {
+        // Becoming, or staying, a transfer: replace the pair. `replace()` handles a row
+        // that was not one — it deletes the single row before writing the two.
+        if ($request->isTransfer()) {
             $this->transfers->replace(
                 $transaction,
                 (int) $data['account_id'],
-                (int) ($data['to_account_id'] ?? $data['account_id']),
+                (int) $data['to_account_id'],
                 (string) $data['amount'],
                 $request->occurredAt(),
                 $data['note'] ?? null,
@@ -154,6 +170,13 @@ final class TransactionController
             $this->toast('Transfer updated.');
 
             return back();
+        }
+
+        // Was a transfer and is not any more: drop the other leg and release this one, then
+        // update it like any other row. It keeps its id, so the edit reads as a correction
+        // rather than as a delete and a re-entry.
+        if ($transaction->isTransfer()) {
+            $this->transfers->unmake($transaction);
         }
 
         $transaction->update($request->transactionAttributes());

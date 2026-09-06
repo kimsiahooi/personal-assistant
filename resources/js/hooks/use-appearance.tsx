@@ -42,6 +42,16 @@ const isDarkMode = (appearance: Appearance): boolean => {
     return appearance === 'dark' || (appearance === 'system' && prefersDark());
 };
 
+/**
+ * What the theme currently resolves to, cached so React can subscribe to it.
+ *
+ * `useSyncExternalStore` compares snapshots by identity and bails when nothing changed —
+ * so deriving "is it dark right now" at render time put it outside the store entirely, and
+ * a `notify()` carrying an unchanged `currentAppearance` (still `'system'`) would not have
+ * re-rendered anything anyway. Keeping it here gives the OS theme its own observable value.
+ */
+let currentResolved: ResolvedAppearance = 'light';
+
 const applyTheme = (appearance: Appearance): void => {
     if (typeof document === 'undefined') {
         return;
@@ -49,6 +59,7 @@ const applyTheme = (appearance: Appearance): void => {
 
     const isDark = isDarkMode(appearance);
 
+    currentResolved = isDark ? 'dark' : 'light';
     document.documentElement.classList.toggle('dark', isDark);
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
 };
@@ -73,7 +84,19 @@ const mediaQuery = (): MediaQueryList | null => {
     return window.matchMedia('(prefers-color-scheme: dark)');
 };
 
-const handleSystemThemeChange = (): void => applyTheme(currentAppearance);
+/**
+ * The OS theme changed while the app is following it.
+ *
+ * `notify()` is the half that was missing: `applyTheme` toggled the `dark` class, so
+ * everything driven by CSS followed, and everything driven by React did not. The 2FA
+ * modal picks its QR colours from `resolvedAppearance`, so a system flip while it was open
+ * left the code drawn for the old theme — unreadable, on the one screen where being
+ * unreadable costs you the recovery codes.
+ */
+const handleSystemThemeChange = (): void => {
+    applyTheme(currentAppearance);
+    notify();
+};
 
 export function initializeTheme(): void {
     if (typeof window === 'undefined') {
@@ -99,9 +122,15 @@ export function useAppearance(): UseAppearanceReturn {
         () => 'system',
     );
 
-    const resolvedAppearance: ResolvedAppearance = isDarkMode(appearance)
-        ? 'dark'
-        : 'light';
+    // Read from the store, not derived at render: see `currentResolved`. The server
+    // snapshot is 'light' because the SSR pass has no media query to ask, and the
+    // pre-paint script in app.blade.php has already put the real class on <html> by the
+    // time anything is visible.
+    const resolvedAppearance: ResolvedAppearance = useSyncExternalStore(
+        subscribe,
+        () => currentResolved,
+        () => 'light',
+    );
 
     const updateAppearance = (mode: Appearance): void => {
         currentAppearance = mode;

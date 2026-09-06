@@ -128,11 +128,31 @@ export function money(label: string, min = '0.01') {
         });
 }
 
-/** A `Y-m-d` date that is today or earlier — mirrors `before_or_equal:today`. */
-export function pastDate(label: string) {
+/**
+ * A `Y-m-d` date, optionally bounded above — mirrors
+ * `['required', 'date_format:Y-m-d', 'before_or_equal:<today>']`.
+ *
+ * **`latest` is a required argument for a reason.** This used to take only a label and
+ * enforce the format alone, while its own comment claimed to mirror `before_or_equal:today`
+ * — so a date in 2099 sailed through the browser and was rejected by the server, which is
+ * the exact drift the parity gate exists to prevent and the one thing that gate cannot see
+ * (it compares field NAMES, not rules).
+ *
+ * The bound is passed in rather than computed from `new Date()`: today belongs to the
+ * viewer's zone, the server is the only side that knows which one that is, and reading the
+ * ambient clock here would disagree with `TransactionRequest`'s own `LocalDate::today()`
+ * around midnight. It is the same `today` the form already receives as a page prop.
+ *
+ * Compared as text, which is safe because `Y-m-d` sorts lexicographically.
+ */
+export function pastDate(label: string, latest: string) {
     return z
         .string({ message: `${label} is required.` })
-        .regex(/^\d{4}-\d{2}-\d{2}$/, `${label} must be a date.`);
+        .min(1, `${label} is required.`)
+        .regex(/^\d{4}-\d{2}-\d{2}$/, `${label} must be a date.`)
+        .refine((value) => value <= latest, {
+            message: `${label} cannot be in the future.`,
+        });
 }
 
 /**

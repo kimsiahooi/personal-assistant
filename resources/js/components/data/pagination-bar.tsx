@@ -40,6 +40,8 @@ type Props = {
  */
 export function PaginationBar({ page, onPage, onPerPage }: Props) {
     const slots = pageWindow(page.current_page, page.last_page);
+    const atStart = page.current_page <= 1;
+    const atEnd = page.current_page >= page.last_page;
 
     return (
         <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -82,14 +84,29 @@ export function PaginationBar({ page, onPage, onPerPage }: Props) {
                         aria-label="Pagination"
                         className="flex items-center gap-1"
                     >
+                        {/*
+                            `aria-disabled`, not `disabled`. These two buttons disable
+                            themselves — the condition is the page number their own click
+                            changes — and a control that gains `disabled` while focused is
+                            blurred by the browser, dropping the focus ring and the screen
+                            reader's point of regard onto `<body>` mid-interaction. Paging
+                            with `preserveState` updates them in place, so it happens on
+                            every arrival at the first or last page. `aria-disabled` keeps
+                            them focusable and announced as unavailable; the guard in the
+                            handler is what actually stops the visit.
+                        */}
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="size-8"
+                            className={cn('size-8', atStart && 'opacity-50')}
                             aria-label="Previous page"
-                            disabled={page.current_page <= 1}
-                            onClick={() => onPage(page.current_page - 1)}
+                            aria-disabled={atStart}
+                            onClick={() => {
+                                if (!atStart) {
+                                    onPage(page.current_page - 1);
+                                }
+                            }}
                         >
                             <ChevronLeft className="size-4" />
                         </Button>
@@ -146,10 +163,14 @@ export function PaginationBar({ page, onPage, onPerPage }: Props) {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="size-8"
+                            className={cn('size-8', atEnd && 'opacity-50')}
                             aria-label="Next page"
-                            disabled={page.current_page >= page.last_page}
-                            onClick={() => onPage(page.current_page + 1)}
+                            aria-disabled={atEnd}
+                            onClick={() => {
+                                if (!atEnd) {
+                                    onPage(page.current_page + 1);
+                                }
+                            }}
                         >
                             <ChevronRight className="size-4" />
                         </Button>

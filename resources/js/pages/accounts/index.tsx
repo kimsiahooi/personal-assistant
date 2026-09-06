@@ -80,9 +80,16 @@ const columns = column.columns([
             hideBelow: 'lg',
             defaultHidden: true,
         }),
+        // Money, so it is formatted like money. It was printing the raw decimal string —
+        // "1500.00" beside "RM 1,500.00" in the next column, no symbol and no grouping.
         cell: ({ row }) => (
-            <span className="text-muted-foreground tabular-nums">
-                {row.original.opening_balance}
+            <span className="text-muted-foreground">
+                <MoneyCell
+                    amount={row.original.opening_balance}
+                    currency={row.original.currency}
+                    signed={false}
+                    muted
+                />
             </span>
         ),
     }),

@@ -50,8 +50,14 @@ export function DateRangeFilter({
         preset.from === from && preset.to === to;
 
     return (
-        <div className="space-y-2">
-            <span className="font-medium text-sm">Date range</span>
+        // A real fieldset with a real legend. The four presets and the two inputs sat under
+        // a bare `<span>`, so a screen reader announced "This month", "From", "To" with
+        // nothing saying what any of them narrowed — and inside a panel that already holds
+        // three other filters, that is genuinely ambiguous. `role="group"` would have named
+        // it too; the native pair is what the platform already understands, and Tailwind's
+        // preflight has already stripped the browser's default border and padding.
+        <fieldset className="space-y-2">
+            <legend className="font-medium text-sm">Date range</legend>
 
             <div className="flex flex-wrap gap-1.5">
                 {presets.map((preset) => (
@@ -112,6 +118,6 @@ export function DateRangeFilter({
                     />
                 </div>
             </div>
-        </div>
+        </fieldset>
     );
 }

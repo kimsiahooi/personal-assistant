@@ -133,7 +133,10 @@ mechanical parts. Six errors:
    whole point of the rule of three.
 4. a controller runs a raw query — `DB::`, `->join(`, `->leftJoin(`, `selectRaw(`, `whereRaw(`.
 5. money arithmetic in the browser, matched in two stages because the operator is rarely next
-   to the field: find `amount`, then find the arithmetic or the `reduce(`.
+   to the field: find any name money travels under — `amount`, `balance`, `magnitude`,
+   `movement`, `opening_balance`, `subtotal`, `<thing>_total`, `net` — then find the
+   arithmetic or the `reduce(`. Bare `total` is excluded on purpose: it already means a row
+   count here, and a gate that cries wolf is one people silence.
 6. a dialog imported from `@/components/ui/dialog` instead of `@/components/feedback/dialog`.
 
 Page size caps are warnings, not errors. 250 lines is a signal that something wants

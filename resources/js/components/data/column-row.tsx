@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react';
-import type { DragEvent } from 'react';
+import type { DragEvent, MouseEvent } from 'react';
 import type { ConfigurableColumn } from '@/components/data/column-layout';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -52,6 +52,30 @@ export function ColumnRow({
     onDragEnd: () => void;
 }) {
     const inputId = `column-${column.id}`;
+    const first = index === 0;
+    const last = index === total - 1;
+
+    /**
+     * Reorder, then put the cursor back on the button that did it.
+     *
+     * The re-focus is deferred to a task rather than run inline: React moves this row's
+     * node during the commit that follows, and focusing before that happens is undone by
+     * the move itself.
+     */
+    const move = (
+        event: MouseEvent<HTMLButtonElement>,
+        to: number,
+        blocked: boolean,
+    ) => {
+        if (blocked) {
+            return;
+        }
+
+        const button = event.currentTarget;
+
+        onMove(to);
+        setTimeout(() => button.focus(), 0);
+    };
 
     return (
         // Dragging is a pointer-only enhancement, and there is no ARIA role meaning "drop
@@ -97,15 +121,28 @@ export function ColumnRow({
                 )}
             </label>
 
+            {/*
+                Two things conspire to lose focus here, and both are handled.
+
+                `aria-disabled` rather than `disabled`, for the reason PaginationBar gives:
+                these buttons disable themselves at the ends of the list — the condition is
+                the index their own click changes — and a control blurred by gaining
+                `disabled` leaves the panel with nothing focused. The panel is a non-modal
+                popover, so there is no focus trap to catch it either.
+
+                And a move relocates this row's DOM node, which also drops focus. Re-focusing
+                the same button after the commit is what lets somebody press Move up
+                repeatedly instead of once.
+            */}
             <span className="flex shrink-0">
                 <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-7"
-                    disabled={index === 0}
+                    className={cn('size-7', first && 'opacity-50')}
+                    aria-disabled={first}
                     aria-label={`Move ${column.label} up`}
-                    onClick={() => onMove(index - 1)}
+                    onClick={(event) => move(event, index - 1, first)}
                 >
                     <ArrowUp className="size-3.5" />
                 </Button>
@@ -113,10 +150,10 @@ export function ColumnRow({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-7"
-                    disabled={index === total - 1}
+                    className={cn('size-7', last && 'opacity-50')}
+                    aria-disabled={last}
                     aria-label={`Move ${column.label} down`}
-                    onClick={() => onMove(index + 1)}
+                    onClick={(event) => move(event, index + 1, last)}
                 >
                     <ArrowDown className="size-3.5" />
                 </Button>

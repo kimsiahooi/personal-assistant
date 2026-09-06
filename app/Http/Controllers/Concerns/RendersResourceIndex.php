@@ -44,8 +44,7 @@ trait RendersResourceIndex
         $term = trim((string) $request->query('search', ''));
         $perPage = $this->perPage($request);
         $sort = $this->sortColumn($request, $sortable);
-        /** @var 'asc'|'desc' $direction */
-        $direction = $request->query('direction') === 'desc' ? 'desc' : $defaultDirection;
+        $direction = $this->direction($request, $defaultDirection);
 
         if ($term !== '' && $search !== null) {
             $search($query, $term);
@@ -70,6 +69,25 @@ trait RendersResourceIndex
                 'extra' => $extra,
             ],
         ];
+    }
+
+    /**
+     * The requested direction, if it is one — otherwise this resource's default.
+     *
+     * **Both directions have to be nameable.** The obvious spelling,
+     * `query('direction') === 'desc' ? 'desc' : $default`, silently equals the default for
+     * every value that is not the literal `desc` — including an explicit `asc`. On the
+     * ledger, whose default is `desc`, that made ascending order unreachable: the header
+     * arrow flipped, the URL said `direction=asc`, and the rows did not move.
+     *
+     * @param  'asc'|'desc'  $default
+     * @return 'asc'|'desc'
+     */
+    private function direction(Request $request, string $default): string
+    {
+        $requested = $request->query('direction');
+
+        return $requested === 'asc' || $requested === 'desc' ? $requested : $default;
     }
 
     /** Bounded, so a crafted `per_page` cannot ask for the whole table. */

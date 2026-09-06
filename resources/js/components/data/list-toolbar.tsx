@@ -1,5 +1,5 @@
 import { Search, X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,14 @@ type Props = {
      * list — {@link DataTable} supplies it, rather than each page remembering to.
      */
     columns?: ReactNode;
+    /**
+     * The search box, so callers outside this component can put the cursor back in it.
+     *
+     * Owned by {@link DataTable} rather than here because {@link ListEmpty} needs it too:
+     * its "Clear search" button unmounts the whole empty state, and the input is the one
+     * control on screen that survives.
+     */
+    inputRef?: RefObject<HTMLInputElement | null>;
 };
 
 /**
@@ -34,6 +42,7 @@ export function ListToolbar({
     onSearch,
     extra,
     columns,
+    inputRef,
 }: Props) {
     const [value, setValue] = useState(search);
 
@@ -61,6 +70,7 @@ export function ListToolbar({
             <div className="relative flex-1 sm:max-w-sm">
                 <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                    ref={inputRef}
                     type="search"
                     value={value}
                     onChange={(event) => setValue(event.target.value)}
@@ -75,7 +85,16 @@ export function ListToolbar({
                         size="icon"
                         aria-label="Clear search"
                         className="absolute top-1/2 right-1 size-7 -translate-y-1/2"
-                        onClick={() => setValue('')}
+                        // The button's own click removes it — it renders only while there
+                        // is something to clear — and React does not relocate focus off a
+                        // node it unmounts, so activating it dropped focus to `<body>` and
+                        // the next Tab restarted at the top of the page. Focusing the input
+                        // synchronously, before React commits the removal, puts the cursor
+                        // exactly where somebody who just cleared a search wants it.
+                        onClick={() => {
+                            inputRef?.current?.focus();
+                            setValue('');
+                        }}
                     >
                         <X className="size-4" />
                     </Button>

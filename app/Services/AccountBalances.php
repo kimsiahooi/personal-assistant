@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Support\Money;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -24,6 +25,33 @@ use Illuminate\Database\Eloquent\Collection;
 final class AccountBalances
 {
     /**
+     * The alias `withSum`/`loadSum` writes the aggregate under.
+     *
+     * Named once because {@see self::for()} decides whether to run a query by looking for
+     * this exact key, and a caller spelling it differently would silently reintroduce the
+     * per-row aggregate this class exists to avoid.
+     */
+    private const SUM = 'transactions as movement';
+
+    private const SUM_KEY = 'movement';
+
+    /**
+     * Attach the balance aggregate to a query the caller is building.
+     *
+     * For a paginated list, which cannot go through {@see self::forAll()} and must not pay
+     * for {@see self::for()} per row. Exposed as a method so the alias stays in this file:
+     * a controller spelling `'transactions as movement'` itself would work until somebody
+     * renamed it here, and would then quietly cost one aggregate per row instead of failing.
+     *
+     * @param  Builder<Account>  $query
+     * @return Builder<Account>
+     */
+    public function attach(Builder $query): Builder
+    {
+        return $query->withSum(self::SUM, 'amount');
+    }
+
+    /**
      * Every account the user owns, each with its balance as a decimal string.
      *
      * @return Collection<int, Account> each carrying a `balance` attribute
@@ -32,7 +60,7 @@ final class AccountBalances
     {
         return Account::query()
             ->when(! $includeArchived, fn ($query) => $query->active())
-            ->withSum('transactions as movement', 'amount')
+            ->withSum(self::SUM, 'amount')
             ->orderBy('name')
             ->get()
             ->each(function (Account $account): void {
@@ -40,10 +68,23 @@ final class AccountBalances
             });
     }
 
-    /** One account's balance, as a decimal string. */
+    /**
+     * One account's balance, as a decimal string.
+     *
+     * **Loads the sum only if nobody has already paid for it.** `AccountController::index`
+     * attaches `withSum` to its paginated query and then maps each row through here; an
+     * unconditional `loadSum` ran a second aggregate per row on top of the one already in
+     * the result set — 25 extra queries a page to recompute numbers it was holding.
+     *
+     * The test is `array_key_exists`, not a null check: `withSum` sets the key to NULL for
+     * an account with no transactions, so "loaded and empty" and "never loaded" are the
+     * same value and only the key's presence tells them apart.
+     */
     public function for(Account $account): string
     {
-        $account->loadSum('transactions as movement', 'amount');
+        if (! array_key_exists(self::SUM_KEY, $account->getAttributes())) {
+            $account->loadSum(self::SUM, 'amount');
+        }
 
         return $this->combine($account);
     }
@@ -70,7 +111,7 @@ final class AccountBalances
     private function combine(Account $account): string
     {
         // `withSum` returns null when an account has no transactions at all.
-        $movement = $account->getAttribute('movement') ?? '0';
+        $movement = $account->getAttribute(self::SUM_KEY) ?? '0';
 
         return Money::add($account->opening_balance, (string) $movement);
     }

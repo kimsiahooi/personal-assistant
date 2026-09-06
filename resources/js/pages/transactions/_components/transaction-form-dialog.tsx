@@ -77,7 +77,9 @@ export function TransactionFormDialog({
                     ? update.form({ transaction: transaction.id })
                     : store.form()
             }
-            schema={transactionSchema}
+            // Built per-render from the server's `today`, so the browser refuses the same
+            // future date the server would. See the schema for why it is a factory.
+            schema={transactionSchema(today)}
             title={editing ? 'Edit transaction' : 'Record a transaction'}
             description={
                 editing

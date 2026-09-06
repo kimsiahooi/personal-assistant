@@ -281,6 +281,12 @@ conversation, not a phase.
   the allow-list governs what `ORDER BY` may name, and a crafted `?sort=created_at` sorts
   correctly — but nothing on screen can reach it. Either give the ledger a "Recorded" column
   (hidden by default, like Accounts has) or drop it from the list.
+- **A dialog closed by a successful delete still loses focus.** `feedback/dialog.tsx` returns
+  focus to whatever opened it, guarded by `isConnected` — and after a delete the row's own
+  Actions button is exactly what no longer exists, so the guard declines and focus stays on
+  `<body>`. Strictly better than before (it was every close, now only this one), and the
+  honest fix is a landing spot the list nominates, which is worth doing when the ledger
+  grows row-level keyboard navigation.
 - **`prefetch-cache.ts` flushes everything on any write.** Inertia can invalidate by cache
   tag instead, which would keep unrelated prefetched pages warm. Not done, and deliberately:
   tagging means tagging every link correctly and forever, and a missed tag brings back a

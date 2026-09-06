@@ -78,6 +78,33 @@ final class RecordTransfer
         });
     }
 
+    /**
+     * Turn a transfer back into an ordinary row: drop the other leg, and release this one
+     * from the pair.
+     *
+     * For an edit that changes a transfer into an income or an expense. The surviving row
+     * keeps its id — the caller then updates it like any other transaction — so a note, a
+     * date and anything referencing it survive a change of mind.
+     *
+     * `transfer_group_id` is cleared here rather than by the caller for the same reason it
+     * is not fillable: a row that still names a group it is no longer part of would be
+     * collected by {@see self::deletePair()} on some later, unrelated delete.
+     */
+    public function unmake(Transaction $leg): void
+    {
+        DB::transaction(function () use ($leg): void {
+            if ($leg->transfer_group_id !== null) {
+                Transaction::query()
+                    ->where('transfer_group_id', $leg->transfer_group_id)
+                    ->whereKeyNot($leg->getKey())
+                    ->delete();
+            }
+
+            $leg->transfer_group_id = null;
+            $leg->save();
+        });
+    }
+
     /** Remove both legs, or neither. */
     public function deletePair(Transaction $leg): void
     {
