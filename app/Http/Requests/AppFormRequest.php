@@ -36,8 +36,14 @@ abstract class AppFormRequest extends FormRequest
     /**
      * Rules for a money field: a decimal string within what `decimal(15,2)` holds.
      *
-     * Validated as a string rather than `numeric`, because `numeric` would accept
-     * `1e3` and PHP would then hand a float to a column that is deliberately not one.
+     * Validated as a string rather than `numeric`, because `numeric` would accept `1e3`
+     * and PHP would then hand a float to a column that is deliberately not one.
+     *
+     * **No `min_digits`.** It reads as "at least one digit" and is not: Laravel's
+     * implementation is `! preg_match('/[^0-9]/', $value)`, so it rejects any value
+     * containing a character that is not a digit — which is every amount with a decimal
+     * point and every negative one. `min_digits:1` made this rule set unsatisfiable for
+     * `100.00`, and the regex below already requires a digit before the point anyway.
      *
      * @return array<int, mixed>
      */
@@ -48,7 +54,6 @@ abstract class AppFormRequest extends FormRequest
             'string',
             'regex:/^-?\d{1,13}(\.\d{1,2})?$/',
             'decimal:0,'.Money::SCALE,
-            'min_digits:1',
             new MoneyRange($min, Money::MAX),
         ];
     }

@@ -39,6 +39,7 @@ hatches are a `data:` URI and a `ui-allow` comment on the line.
 | Borders / inputs | `border-border`, `border-input` |
 | Destructive **surface** | `<Button variant="destructive">` — fills with `--destructive` |
 | Destructive **text** | `text-destructive` — a red icon or label on an ordinary surface |
+| Money **in** | `text-income` — the counterpart, contrast-matched to `--destructive` |
 | Chart series | `var(--chart-1)` … `var(--chart-5)`, assigned in order |
 
 **A link is `text-link`, not `text-primary`.** `--primary` is a *surface* colour: it is
@@ -48,10 +49,10 @@ page behind it, and in dark mode it is deliberately *darker* than its light coun
 background that is about 2.8:1, well under the 4.5:1 a link needs. `--link` is the same
 hue with its lightness chosen per theme against the background it actually sits on.
 
-**The two destructive tokens are not interchangeable — but only one of them is wired
-here.** The vendored components read `--destructive` for both jobs: `bg-destructive` (the
-solid button) and `text-destructive` (a red label, icon or menu item). One value serves
-two contrast requirements because of where the knock-back lives — `ui/button.tsx` carries
+**One destructive token does two jobs.** The vendored components read `--destructive` for
+both: `bg-destructive` (the solid button) and `text-destructive` (a red label, icon or menu
+item). One value serves two contrast requirements because of where the knock-back lives —
+`ui/button.tsx` carries
 `dark:bg-destructive/60`, so in dark mode the surface is the light red at 60% over the
 card, compositing to #A24547 with white on it at **6.03:1**, while `text-destructive` is
 that same red at full strength on the card at **6.19:1**. Both AA. In light mode one value
@@ -60,11 +61,11 @@ already does both: white on it 4.77:1, it on white 4.77:1.
 **Do not copy the reference's dark value.** `laravel-ms-ai-v2` sets `--destructive` to
 lightness 0.505 in dark because its `button.tsx` predates `dark:bg-destructive/60` and
 renders the token raw, so its palette has to do the darkening. Ours must not: 0.505
-knocked back again lands on a muddy #693132. `--destructive-foreground` exists, holds the
-light red, and is used by nothing in this app today — it is kept for the components being
-ported from the reference, which say `text-destructive-foreground`. **Write
-`text-destructive` in new code.** The full reasoning sits beside the tokens in `app.css`;
-that file is authoritative, not this table.
+knocked back again lands on a muddy #693132. There is deliberately **no
+`--destructive-foreground`**: the reference writes `text-destructive-foreground`, nothing
+here does, and a second token holding the identical value would be one nothing reads.
+**Write `text-destructive`.** The full reasoning sits beside the tokens in `app.css`; that
+file is authoritative, not this table.
 
 **`--radius: 0`.** `--radius-sm/md/lg` all derive from it, so `rounded-sm`, `rounded-md`
 and `rounded-lg` are square. `rounded-xl` and up are *not* token-derived and will round —
@@ -120,7 +121,11 @@ sum, balance, net and month-total is a SQL expression and arrives as its own fie
 belongs in the query.
 
 Don't let colour carry the sign. A `−` / `+`, or the word *income* / *expense*, does the
-work; colour only agrees with it.
+work; colour only agrees with it. `MoneyCell` is where that rule is kept: it always renders
+an explicit sign, and only then reaches for `text-income` or `text-destructive`. Those two
+are red against green — the pair colour-vision deficiency confuses most — which is exactly
+why the sign has to be there and is not negotiable. Read the ledger in greyscale; if it
+still parses, the rule is being followed.
 
 ## 5. Charts
 

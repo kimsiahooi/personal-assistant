@@ -33,8 +33,10 @@ account_name: string,
 category_id: number | null,
 category_name: string | null,
 category_colour: string | null,
+category_icon: string | null,
 transfer_group_id: string | null,
 transfer_counterpart_name: string | null,
+transfer_counterpart_account_id: number | null,
 };
 }
 namespace Enums {

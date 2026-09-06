@@ -54,6 +54,26 @@ final class TransactionRequest extends AppFormRequest
         ];
     }
 
+    /**
+     * Names for the messages, because Laravel derives them from the field and the field is
+     * named for the wire.
+     *
+     * "The occurred on field must be a date before or equal to…" and "The to account id
+     * field is required" are what it produces otherwise — the column names read aloud, in
+     * front of somebody who never saw them.
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'occurred_on' => 'date',
+            'account_id' => 'account',
+            'to_account_id' => 'destination account',
+            'category_id' => 'category',
+        ];
+    }
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
@@ -145,7 +165,7 @@ final class TransactionRequest extends AppFormRequest
         if (! $matches) {
             $validator->errors()->add(
                 'category_id',
-                "The selected category is not {$expected->value} category.",
+                "The selected category is not an {$expected->value} category.",
             );
         }
     }

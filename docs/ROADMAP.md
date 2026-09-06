@@ -85,8 +85,8 @@ leaves the app working and stops for review.
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 · Backend domain | migrations, enums, models, `App\Support\Money`, FormRequests, DTOs, controllers, routes, the metrics service | ⬜ |
-| 2 · Shared kit + modules | the `components/{data,form,feedback}` port, the zod gate, `lib/money.ts`, the three module trees, the shell | ⬜ |
+| 1 · Backend domain | migrations, enums, models, `App\Support\Money`, FormRequests, DTOs, controllers, routes, the metrics service | ✅ |
+| 2 · Shared kit + modules | the `components/{data,form,feedback}` port, the zod gate, `lib/money.ts`, the three module trees, the shell | ✅ |
 | 3 · Dashboard | this month in/out/net, balance per account, spending by category, 6-month trend | ⬜ |
 
 ### Phase 1 — the backend domain
@@ -122,28 +122,28 @@ SQL aggregate**: this month's in / out / net, the balance per account, spend gro
 category, and six months of monthly totals. Nothing sums rows in PHP either — the rule is
 about where arithmetic happens, not which language it happens in.
 
-### One decision still open: how a transfer is stored
+### Settled: a transfer is two legs
 
-Two shapes, and it is not settled.
+Two rows sharing a `transfer_group_id` — negative on the source, positive on the
+destination — written together by `App\Actions\RecordTransfer`, which is the only thing in
+the app allowed to write a row of type `transfer`.
 
-**One row.** `transactions` gains a nullable `to_account_id`; a transfer is a single row
-with `type = transfer`. Editing and deleting are atomic and cheap — one row, no invariant to
-hold. The cost lands on every read: "transactions for this account" becomes
-`WHERE account_id = ? OR to_account_id = ?`, an OR across two indexed columns, and the
-running balance becomes a `CASE` over both.
+The alternative was one row with a nullable `to_account_id`. **What decided it was writing
+the four queries both ways**: the account transaction list, the per-account running balance,
+spend-by-category, and this month's in/out/net. Under two legs every one of them stays
+`WHERE account_id = ?` over a plain signed `SUM(amount)`; under one row, three of the four
+become an `OR` across two indexed columns with a `CASE` over the sign, and the running
+balance stops being a sum at all.
 
-**Two legs.** An outgoing and an incoming row sharing a `transfer_group_id`. Every
-per-account query stays `WHERE account_id = ?` and the running balance stays a plain
-signed sum, which is the shape the dashboard already wants. The cost lands on writes:
-edit and delete touch two rows inside a database transaction, and a half-written pair is
-an unbalanced ledger — so it needs the transaction and probably a consistency check. The
-list also shows a transfer twice unless it collapses by group.
+The costs, both real and both paid:
 
-**What decides it: write the four queries both ways first** — the account transaction list,
-the per-account running balance, spend-by-category, and this month's in/out/net — then
-count what edit and delete cost under each. All four must exclude transfers from income and
-expense totals regardless of the model, and that requirement is the one most likely to make
-one of the two obviously simpler.
+- **Edit and delete touch two rows.** Both go through `RecordTransfer` inside a database
+  transaction, and edit is delete-then-write rather than update-both, because an edit can
+  change which accounts are involved. Soft deletes mean a mistake is recoverable.
+- **The list would show a transfer twice.** `TransactionController::index` shows only the
+  outbound leg unless the list is filtered to one account — across accounts a transfer is
+  one event, and inside one account both legs really are separate movements of that
+  account's money.
 
 ### Phase 2 — the shared kit, and the three modules
 
@@ -151,18 +151,37 @@ The reference's `components/data/` (18 files), `components/form/` (6) and
 `components/feedback/` (3) come to about 3,900 lines. Roughly 21 of those 27 files port
 across, stripped of `t()`:
 
-- **Not coming:** `stock-picker-field.tsx` and `on-hand-line.tsx`, which have no analogue,
-  and the four-file column-preferences group (`column-panel`, `column-row`,
-  `column-layout`, `use-column-layout`) — see the gaps below.
-- **`feedback/dialog.tsx` needs a fresh decision.** Its stated reason was the untranslated
-  close button, and that reason is gone. Its incidental improvement is not: the vendored
-  primitive's dismiss button is a bare `size-4` icon — a 16px target, under WCAG 2.2's 24px
-  minimum. That alone may still justify the wrapper, but it is a target-size argument now,
-  not an i18n one, and the structure rule that forced the import no longer exists.
+What actually landed, and what did not:
+
+- **Not ported:** `stock-picker-field.tsx`, `on-hand-line.tsx`, `order-line-row.tsx`,
+  `order-lines-field.tsx`, `decimal-cell.tsx` and `combobox-field.tsx` — all shapes with no
+  analogue here. `combobox-filter.tsx` and `checkbox-filter.tsx` went too: a personal
+  ledger's account and category lists are short, and a search box over five rows is
+  furniture. `SelectFilter` covers every filter this app has.
+- **The Columns panel came across; its persistence did not.** `column-panel`, `column-row`
+  and `column-layout` are all here, so `hideBelow`, `defaultHidden` and the drag/reorder
+  behaviour work. `use-column-layout.ts` is replaced by a `useState` in `DataTable`: the
+  layout survives searching, sorting and paging, and resets on navigation. Remembering it
+  across visits needs a server round trip to stay hydration-safe — the seed has to be a
+  value both sides already agree on — and that is a table, a controller and a shared prop.
+  Recorded below rather than guessed at.
+- **`feedback/dialog.tsx` was kept, on target-size grounds.** Its original reason was the
+  untranslated close button and that reason is gone; the incidental improvement is not. The
+  vendored primitive's dismiss button is a bare `size-4` icon — a 16px target, under WCAG
+  2.2 (2.5.8)'s 24px minimum, on the one control in a dialog somebody in a hurry reaches
+  for. The wrapper renders a 36px `Button` in its place. `check-structure.sh` **rule 6** now
+  enforces the import, replacing the dropped i18n rule with a target-size one; the starter
+  kit's three own dialogs were redirected through it at the same time.
 - **`lib/validation/message.ts` does not come across.** It exists to carry a translation key
   and its params through zod's message slot. With one language, primitives return the
   English sentence Laravel's own validator would produce, and parity is checked by reading
   both.
+- **Added, with no counterpart in the reference:** `lib/labels.ts` (enum words, keyed by the
+  generated unions so a new PHP case is a `tsc` error), `lib/category-style.ts` and
+  `lib/category-icons.ts` (a category stores a *chart token name* and a lucide icon name,
+  not a hex and not an arbitrary import), `components/data/money-cell.tsx`,
+  `components/data/category-badge.tsx`, `components/data/date-range-filter.tsx`,
+  `components/form/date-field.tsx` and `components/form/checkbox-field.tsx`.
 
 Alongside them: `lib/money.ts` (format and parse, deliberately no `add()`), `lib/format.ts`
 for the deterministic date helpers, `lib/pagination.ts`, `lib/prefetch-cache.ts` — that last
@@ -234,11 +253,15 @@ conversation, not a phase.
   placeholder and still routes `/` to it; turning that route into a redirect is outstanding
   work there too. Left alone here because it is a routing decision that belongs with slice
   1's routes.
-- **Column-visibility persistence was deliberately left out of the DataTable port.** The
-  reference's version is four frontend files plus a controller, an `App\Support\TableColumns`
-  validator, an enum and a column on `users` — a migration and an endpoint for a preference.
-  Three lists with under a dozen columns each do not need the reader to hide any. Revisit if
-  the transactions table grows past what fits at 1024px.
+- **The Columns panel works but does not remember.** `column-panel`, `column-row` and
+  `column-layout` all ported; `use-column-layout.ts` did not. `DataTable` seeds the layout
+  from the column declarations with a `useState`, so it survives searching, sorting and
+  paging and resets on navigation. Persisting it is not a `localStorage` call: SSR renders
+  the header row, so the seed has to be a value both sides already agree on before the first
+  paint — which means a server prop, which means the reference's controller, an
+  `App\Support\TableColumns` validator, a `TableKey` enum and a column on `users`. That is a
+  migration and an endpoint for a preference on three lists with fewer than a dozen columns
+  each. Revisit if the ledger grows past what fits at 1024px.
 - **The Wayfinder trees are large for a route table this small** — 50 generated modules,
   324 KB of TypeScript across `resources/js/{actions,routes,wayfinder}`, all three
   gitignored. Nothing has measured what survives tree-shaking into the client bundle, and
@@ -249,14 +272,17 @@ conversation, not a phase.
   is deliberate — the vendored tree is read-only and self-consistent — but it is two copies
   of one function in the bundle and a pre-1.0 dependency. The entry is in
   `docs/PACKAGE-POLICY.md`; revisit when the registry moves.
-- **`--destructive-foreground` has no consumer.** It is defined in both modes, and the note
-  beside it in `app.css` keeps it "for the ones ported from laravel-ms-ai-v2 in Phase 6" —
-  that is the reference's phase numbering, not this project's. Checked: none of the
-  reference's `components/{data,form,feedback}` uses the class, and this repo's
-  `passkey-item.tsx` already says `text-destructive`. Either phase 2's port picks it up or
-  the token goes.
-- **`check-validation-parity.ts` still carries the reference's `FACTORY_ARGS`** — 13 entries
-  naming `BomRequest`, `ProductRequest`, `StockTransferRequest`, `StockTakeCountRequest` and
-  friends. They are inert, since the map is keyed by request class name and none of those
-  classes exists, but it is manufacturing vocabulary sitting in a finance app's gate and it
-  will mislead whoever reads the script next. Clear it when the first real FormRequest lands.
+- **A transfer row costs one extra query.** `TransactionController::counterpart()` loads the
+  other leg per transfer row, so a page of transfers is an N+1. Accepted rather than hidden:
+  only transfers pay it, a page holds at most 100 rows, and the alternative is a self-join
+  on `transfer_group_id` that complicates every other read of the list. Revisit if a page of
+  mostly-transfers ever feels slow.
+- **The ledger's sort allow-list advertises `created_at`, which has no column.** Harmless —
+  the allow-list governs what `ORDER BY` may name, and a crafted `?sort=created_at` sorts
+  correctly — but nothing on screen can reach it. Either give the ledger a "Recorded" column
+  (hidden by default, like Accounts has) or drop it from the list.
+- **`prefetch-cache.ts` flushes everything on any write.** Inertia can invalidate by cache
+  tag instead, which would keep unrelated prefetched pages warm. Not done, and deliberately:
+  tagging means tagging every link correctly and forever, and a missed tag brings back a
+  stale-page bug that looks like a lost save. Revisit only if prefetching stops feeling
+  instant.

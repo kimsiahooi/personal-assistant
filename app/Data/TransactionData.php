@@ -41,10 +41,20 @@ final class TransactionData extends Data
         public ?int $category_id,
         public ?string $category_name,
         public ?string $category_colour,
+        public ?string $category_icon,
         /** Present on both legs of a transfer, null on everything else. */
         public ?string $transfer_group_id,
-        /** The other account a transfer touched, resolved for display. */
+        /** The other account a transfer touched — its name, for the list to show. */
         public ?string $transfer_counterpart_name,
+        /**
+         * …and its id, for the edit form to pre-select.
+         *
+         * Sent alongside the name rather than looked up when the dialog opens, because a
+         * transfer is a pair and the row on screen only carries one half of it: without
+         * this, opening Edit on a transfer would show an empty destination and saving it
+         * would rewrite the pair against whatever was picked instead.
+         */
+        public ?int $transfer_counterpart_account_id,
     ) {}
 
     /**
@@ -52,11 +62,13 @@ final class TransactionData extends Data
      *                            standing for a local day, so reading it back without
      *                            this reports the UTC day — the previous one for
      *                            anything recorded before 08:00 in Malaysia.
+     * @param  Transaction|null  $counterpart  The other leg, when this row is a transfer.
+     *                                         Expected to have `account` loaded.
      */
     public static function fromTransaction(
         Transaction $transaction,
         string $timezone,
-        ?string $counterpartName = null,
+        ?Transaction $counterpart = null,
     ): self {
         return new self(
             id: $transaction->id,
@@ -74,8 +86,10 @@ final class TransactionData extends Data
             category_id: $transaction->category_id,
             category_name: $transaction->category?->name,
             category_colour: $transaction->category?->colour,
+            category_icon: $transaction->category?->icon,
             transfer_group_id: $transaction->transfer_group_id,
-            transfer_counterpart_name: $counterpartName,
+            transfer_counterpart_name: $counterpart?->account->name,
+            transfer_counterpart_account_id: $counterpart?->account_id,
         );
     }
 }

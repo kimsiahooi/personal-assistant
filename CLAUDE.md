@@ -103,6 +103,10 @@ The full table, the vendored-component escalation ladder and the routing traps a
   Pass props, **wrap** the primitive in your own `components/` file, or compose
   `radix-ui` directly. `scripts/ui-guard.sh` enforces this — it blocks *modifications*,
   not additions, so `shadcn add` of a new component is fine.
+- **Dialogs come from `@/components/feedback/dialog`, never `@/components/ui/dialog`.**
+  The vendored primitive's dismiss button is a 16px target, under the WCAG 2.2 minimum; the
+  wrapper replaces it with a 36px one and re-exports the rest untouched.
+  `scripts/check-structure.sh` rule 6 fails the commit otherwise.
 - **`cn` comes from `@/lib/utils` in authored code.** The vendored tree imports the npm
   `cn` package instead; that is the registry's choice and it is left alone. Do not follow
   it outside `ui/`.

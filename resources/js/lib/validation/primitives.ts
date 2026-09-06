@@ -78,12 +78,30 @@ export function optionalText({ label, max }: TextOptions) {
         .nullish();
 }
 
-/** One of a fixed set — mirrors `Rule::enum()`. */
+/**
+ * One of a fixed set — mirrors `['required', Rule::enum(...)]`.
+ *
+ * **Two different failures, two different sentences.** A `SelectField` submits `''` when
+ * nothing is chosen, and zod reports that as the same `invalid_value` issue as a genuinely
+ * wrong code — so a single message meant an untouched picker complained "Type is not a
+ * valid choice", which is both untrue and no help at all. Laravel would have said "The type
+ * field is required", and that is the one the reader needs.
+ *
+ * The wrong-code branch is for a crafted request or a stale form; the server rejects those
+ * too, and this only decides which sentence appears first.
+ */
 export function choice<T extends readonly [string, ...string[]]>(
     label: string,
     values: T,
 ) {
-    return z.enum(values, { message: `${label} is not a valid choice.` });
+    return z.enum(values, {
+        error: (issue) =>
+            issue.input === '' ||
+            issue.input === undefined ||
+            issue.input === null
+                ? `${label} is required.`
+                : `${label} is not a valid choice.`,
+    });
 }
 
 /**
@@ -115,6 +133,26 @@ export function pastDate(label: string) {
     return z
         .string({ message: `${label} is required.` })
         .regex(/^\d{4}-\d{2}-\d{2}$/, `${label} must be a date.`);
+}
+
+/**
+ * A checkbox — mirrors Laravel's `boolean` rule, which accepts `true`, `false`, `1`, `0`,
+ * `'1'` and `'0'`.
+ *
+ * A form sends strings, and an unchecked box sends nothing at all, so the union and the
+ * `nullish()` are not defensive padding — they are the three shapes this field genuinely
+ * arrives in. Anything outside them is what the rule would reject server-side.
+ */
+export function flag() {
+    return z
+        .union([
+            z.boolean(),
+            z.literal('0'),
+            z.literal('1'),
+            z.literal(0),
+            z.literal(1),
+        ])
+        .nullish();
 }
 
 /** A foreign key — `['integer', Rule::exists(...)]`. Existence is the server's job. */

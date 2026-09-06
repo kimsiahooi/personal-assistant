@@ -9,6 +9,7 @@ use App\Data\CategoryData;
 use App\Data\TransactionData;
 use App\Enums\TransactionType;
 use App\Http\Controllers\Concerns\RendersResourceIndex;
+use App\Http\Controllers\Concerns\RespondsWithToast;
 use App\Http\Requests\TransactionRequest;
 use App\Models\Account;
 use App\Models\Category;
@@ -24,6 +25,7 @@ use Inertia\Response;
 final class TransactionController
 {
     use RendersResourceIndex;
+    use RespondsWithToast;
 
     public function __construct(private readonly RecordTransfer $transfers) {}
 
@@ -42,15 +44,20 @@ final class TransactionController
         $type = TransactionType::tryFrom((string) $request->query('type', ''));
         $timezone = TimeZones::resolve($request);
         [$from, $to] = $this->dateRange($request);
-        // A local range becomes a half-open UTC window. Comparing the raw local strings
-        // against a UTC column would drop the first day of any range for a viewer east
-        // of UTC, and add an extra one for a viewer west of it.
-        [$fromUtc, $toUtc] = $from !== null && $to !== null
-            ? LocalDate::range($from, $to, $timezone)
-            : [null, null];
+        // Each bound converts on its own, so half a range still narrows the list. Binding
+        // them together meant a `from` with no `to` counted towards the Filters badge and
+        // changed nothing — a filter that says it is on and is not.
+        //
+        // A local day becomes a UTC instant here because the column is UTC: comparing the
+        // raw local string against it would drop the first day of any range for a viewer
+        // east of UTC and add an extra one for a viewer west of it. The upper bound is
+        // half-open — the start of the day *after* `$to` — because the alternative needs a
+        // "last representable instant", and `23:59:59` silently drops the final second.
+        $fromUtc = $from === null ? null : LocalDate::toUtc($from, $timezone);
+        $toUtc = $to === null ? null : LocalDate::toUtc($to, $timezone)->addDay();
 
         $query = Transaction::query()
-            ->with(['account:id,name', 'category:id,name,colour'])
+            ->with(['account:id,name', 'category:id,name,colour,icon'])
             ->when($accountId !== null, fn ($q) => $q->where('account_id', $accountId))
             ->when($categoryId !== null, fn ($q) => $q->where('category_id', $categoryId))
             ->when($type !== null, fn ($q) => $q->where('type', $type))
@@ -86,7 +93,7 @@ final class TransactionController
                 fn (Transaction $t) => TransactionData::fromTransaction(
                     $t,
                     $timezone,
-                    $this->counterpartName($t),
+                    $this->counterpart($t),
                 ),
             ),
             'filters' => $list['filters'],
@@ -94,6 +101,12 @@ final class TransactionController
                 ->get(['id', 'name'])->map->only(['id', 'name'])->all(),
             'categories' => Category::query()->active()->orderBy('name')->get()
                 ->map(CategoryData::fromCategory(...))->all(),
+            // The viewer's own today, so the form can default to it and the range presets
+            // have something to count back from. Sent rather than derived in the browser:
+            // `new Date()` there is the ambient clock, which is the one thing SSR cannot
+            // agree on — and it would be the browser's idea of today rather than the one
+            // this page's rows were converted against.
+            'today' => LocalDate::today($timezone),
         ]);
     }
 
@@ -110,12 +123,16 @@ final class TransactionController
                 $data['note'] ?? null,
             );
 
-            return back()->with('success', 'Transfer recorded.');
+            $this->toast('Transfer recorded.');
+
+            return back();
         }
 
         Transaction::create($request->transactionAttributes());
 
-        return back()->with('success', 'Transaction recorded.');
+        $this->toast('Transaction recorded.');
+
+        return back();
     }
 
     public function update(TransactionRequest $request, Transaction $transaction): RedirectResponse
@@ -134,12 +151,16 @@ final class TransactionController
                 $data['note'] ?? null,
             );
 
-            return back()->with('success', 'Transfer updated.');
+            $this->toast('Transfer updated.');
+
+            return back();
         }
 
         $transaction->update($request->transactionAttributes());
 
-        return back()->with('success', 'Transaction updated.');
+        $this->toast('Transaction updated.');
+
+        return back();
     }
 
     public function destroy(Transaction $transaction): RedirectResponse
@@ -147,22 +168,34 @@ final class TransactionController
         if ($transaction->isTransfer()) {
             $this->transfers->deletePair($transaction);
 
-            return back()->with('success', 'Transfer deleted.');
+            $this->toast('Transfer deleted.');
+
+            return back();
         }
 
         $transaction->delete();
 
-        return back()->with('success', 'Transaction deleted.');
+        $this->toast('Transaction deleted.');
+
+        return back();
     }
 
-    /** The account at the other end of a transfer, for the list to name. */
-    private function counterpartName(Transaction $transaction): ?string
+    /**
+     * The other leg of a transfer, with its account loaded — the list names it and the
+     * edit form pre-selects it.
+     *
+     * One query per transfer row, which is a genuine N+1 and is accepted here: only
+     * transfers pay it, a page holds at most 100 rows, and the alternative is a second
+     * self-join keyed on `transfer_group_id` that would complicate every other read of
+     * this list. Recorded in docs/ROADMAP.md rather than pretended away.
+     */
+    private function counterpart(Transaction $transaction): ?Transaction
     {
         if (! $transaction->isTransfer()) {
             return null;
         }
 
-        return $transaction->counterpart()->with('account:id,name')->first()?->account->name;
+        return $transaction->counterpart()->with('account:id,name')->first();
     }
 
     /** A query id, kept only if it resolves to one of the user's own rows. */

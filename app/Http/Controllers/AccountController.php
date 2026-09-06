@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Data\AccountData;
 use App\Enums\AccountType;
 use App\Http\Controllers\Concerns\RendersResourceIndex;
+use App\Http\Controllers\Concerns\RespondsWithToast;
 use App\Http\Requests\AccountRequest;
 use App\Models\Account;
 use App\Services\AccountBalances;
@@ -19,6 +20,7 @@ use Inertia\Response;
 final class AccountController
 {
     use RendersResourceIndex;
+    use RespondsWithToast;
 
     public function __construct(private readonly AccountBalances $balances) {}
 
@@ -52,16 +54,20 @@ final class AccountController
 
     public function store(AccountRequest $request): RedirectResponse
     {
-        Account::create($request->validated());
+        $account = Account::create($request->accountAttributes());
 
-        return back()->with('success', 'Account created.');
+        $this->toast("{$account->name} added.");
+
+        return back();
     }
 
     public function update(AccountRequest $request, Account $account): RedirectResponse
     {
-        $account->update($request->validated());
+        $account->update($request->accountAttributes($account));
 
-        return back()->with('success', 'Account updated.');
+        $this->toast("{$account->name} updated.");
+
+        return back();
     }
 
     /**
@@ -75,14 +81,20 @@ final class AccountController
     public function destroy(Account $account): RedirectResponse
     {
         if ($account->transactions()->exists()) {
-            return back()->with(
+            $this->toast(
+                "{$account->name} has transactions. Archive it instead of deleting it.",
                 'error',
-                'This account has transactions. Archive it instead of deleting it.',
             );
+
+            return back();
         }
+
+        $name = $account->name;
 
         $account->delete();
 
-        return back()->with('success', 'Account deleted.');
+        $this->toast("{$name} deleted.");
+
+        return back();
     }
 }

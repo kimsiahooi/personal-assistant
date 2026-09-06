@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { choice, optionalText, text } from '@/lib/validation/primitives';
+import { choice, flag, optionalText, text } from '@/lib/validation/primitives';
 
 /** Mirrors `App\Http\Requests\CategoryRequest`. */
 export const categorySchema = z.object({
@@ -7,5 +7,6 @@ export const categorySchema = z.object({
     kind: choice('Kind', ['income', 'expense']),
     colour: optionalText({ label: 'Colour', max: 20 }),
     icon: optionalText({ label: 'Icon', max: 40 }),
-    archived_at: z.union([z.string(), z.null()]).nullish(),
+    /** Whether, not when — see the account schema. */
+    archived: flag(),
 });

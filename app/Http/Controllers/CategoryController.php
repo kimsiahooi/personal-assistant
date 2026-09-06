@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Data\CategoryData;
 use App\Enums\CategoryKind;
 use App\Http\Controllers\Concerns\RendersResourceIndex;
+use App\Http\Controllers\Concerns\RespondsWithToast;
 use App\Http\Requests\CategoryRequest;
 use App\Models\Category;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,6 +19,7 @@ use Inertia\Response;
 final class CategoryController
 {
     use RendersResourceIndex;
+    use RespondsWithToast;
 
     public function index(Request $request): Response
     {
@@ -47,16 +49,20 @@ final class CategoryController
 
     public function store(CategoryRequest $request): RedirectResponse
     {
-        Category::create($request->validated());
+        $category = Category::create($request->categoryAttributes());
 
-        return back()->with('success', 'Category created.');
+        $this->toast("{$category->name} added.");
+
+        return back();
     }
 
     public function update(CategoryRequest $request, Category $category): RedirectResponse
     {
-        $category->update($request->validated());
+        $category->update($request->categoryAttributes($category));
 
-        return back()->with('success', 'Category updated.');
+        $this->toast("{$category->name} updated.");
+
+        return back();
     }
 
     /**
@@ -65,8 +71,12 @@ final class CategoryController
      */
     public function destroy(Category $category): RedirectResponse
     {
+        $name = $category->name;
+
         $category->delete();
 
-        return back()->with('success', 'Category deleted.');
+        $this->toast("{$name} deleted. Its transactions are now uncategorised.");
+
+        return back();
     }
 }

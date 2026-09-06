@@ -14,6 +14,8 @@
 #   4. a controller runs a raw query — DB::, ->join( or a SQL string belong in a Service.
 #   5. money arithmetic in the browser. Amounts cross the wire as decimal strings and
 #      every total is computed in SQL; a sum in React is where float drift gets back in.
+#   6. a dialog imported straight from ui/ — its 16px close button is under the WCAG
+#      target-size minimum, and components/feedback/dialog.tsx is the 36px replacement.
 #
 # Warnings (exit 0): size caps. A page over 250 lines or a controller method over 30 is
 # a signal that a piece wants extracting, not a rule — so it prompts rather than blocks.
@@ -92,6 +94,22 @@ done < <(grep -rn -E '\.amount|\bamount\b' "$JS" 2>/dev/null \
     | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(\*|//|/\*)' \
     | grep -E '[[:space:]][-+*/][[:space:]]|[-+*/]=|\breduce\(' \
     | grep -v 'money-allow')
+
+# --- 6. dialogs come from feedback/, not straight from ui/ --------------------
+# The vendored DialogContent renders its dismiss button as a bare `size-4` icon: a 16px
+# target, under the 24px WCAG 2.2 (2.5.8) minimum, on the one control in a dialog that
+# somebody in a hurry reaches for. `components/feedback/dialog.tsx` turns that button off
+# and renders a 36px Button in its place, and re-exports everything else untouched — so
+# the fix is a one-line import change and the failure mode is invisible on screen, which
+# is exactly the kind of thing that needs a gate rather than a review comment.
+#
+# feedback/dialog.tsx itself is the one file that must import the primitive; it is the
+# wrapper. AlertDialog is a different component with its own markup and is not covered.
+while IFS= read -r hit; do
+    fail "${hit%%:*}: import Dialog from '@/components/feedback/dialog' — ui/dialog's 16px close button is under the WCAG target-size minimum."
+done < <(grep -rn "from '@/components/ui/dialog'" "$JS" 2>/dev/null \
+    | grep -v '^resources/js/components/feedback/dialog.tsx:' \
+    | grep -v "$JS/components/feedback/dialog.tsx:")
 
 # --- size caps, as warnings --------------------------------------------------
 while IFS= read -r file; do

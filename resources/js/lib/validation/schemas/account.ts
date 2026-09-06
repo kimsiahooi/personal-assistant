@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { choice, money, optionalText, text } from '@/lib/validation/primitives';
+import {
+    choice,
+    flag,
+    money,
+    optionalText,
+    text,
+} from '@/lib/validation/primitives';
 
 /**
  * Mirrors `App\Http\Requests\AccountRequest`. Every key the server validates has one
@@ -13,5 +19,8 @@ export const accountSchema = z.object({
     type: choice('Type', ['bank', 'cash', 'ewallet', 'credit_card']),
     opening_balance: money('Opening balance', '0'),
     note: optionalText({ label: 'Note', max: 1000 }),
-    archived_at: z.union([z.string(), z.null()]).nullish(),
+    // The wire carries whether, not when: the server stamps the timestamp. See
+    // AccountRequest::accountAttributes(). A checkbox submits '1' or '0', so the
+    // browser's boolean is a string by the time it reaches here.
+    archived: flag(),
 });

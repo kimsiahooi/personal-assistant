@@ -125,7 +125,7 @@ and agents make mistakes.
 
 Structure rules decay unless something checks them, and there is no test suite here.
 `scripts/check-structure.sh` runs in the lefthook pre-commit hook and enforces the
-mechanical parts. Five errors:
+mechanical parts. Six errors:
 
 1. `lib/` imports React — it is meant to be pure functions, understandable by reading.
 2. `components/` imports from `pages/` — dependencies run `pages → components → ui`.
@@ -134,21 +134,24 @@ mechanical parts. Five errors:
 4. a controller runs a raw query — `DB::`, `->join(`, `->leftJoin(`, `selectRaw(`, `whereRaw(`.
 5. money arithmetic in the browser, matched in two stages because the operator is rarely next
    to the field: find `amount`, then find the arithmetic or the `reduce(`.
+6. a dialog imported from `@/components/ui/dialog` instead of `@/components/feedback/dialog`.
 
 Page size caps are warnings, not errors. 250 lines is a signal that something wants
 extracting, and a signal that blocks the commit stops being read as a signal.
 
-The reference has a fifth rule that is not here — its fourth: dialogs had to come from
-`components/feedback/dialog.tsx` rather than the vendored primitive, because the vendored
-`DialogContent` labels its dismiss button "Close" in hard-coded English and the label is
-`sr-only`, so no screen catches it. That facade existed to translate one button. This app is
-English-only — no `lang/`, no `t()` — so the facade has nothing to fix and the rule had
-nothing to enforce. Both were dropped rather than carried along as decoration; dialogs here
-import `@/components/ui/dialog` directly, and money arithmetic took the freed slot 5.
+**Rule 6 is the reference's dialog rule, kept for a different reason.** There it existed to
+translate one button: the vendored `DialogContent` labels its dismiss button "Close" in
+hard-coded English, `sr-only`, where no screen catches it. This app is English-only, so that
+argument is gone — and the rule survived anyway, because the same button is a bare `size-4`
+icon: a **16px** target against WCAG 2.2 (2.5.8)'s 24px minimum, on the one control in a
+dialog somebody in a hurry reaches for. `components/feedback/dialog.tsx` turns the
+primitive's button off and renders a 36px `Button` in its place, re-exporting everything
+else untouched, so switching a call site is a one-line import change.
 
-A wrapper may still return on other grounds — the vendored dismiss button is a bare
-`size-4` icon, a 16px target against WCAG 2.2's 24px minimum, and ROADMAP's phase 2 leaves
-that open. It would be a new argument, not the translated one.
+The failure it guards is invisible on screen — the dialog looks identical either way — which
+is precisely why it is a gate rather than a review comment. It was dropped during the port
+planning and reinstated when the wrapper landed; money arithmetic keeps slot 5.
+`AlertDialog` is a different component with its own markup and is not covered.
 
 Anything a script can decide should be a script, not a review comment — the same reasoning as
 `scripts/check-validation-parity.ts`, which reads `app/Http/Requests` non-recursively (which

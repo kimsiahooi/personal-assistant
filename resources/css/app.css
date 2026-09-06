@@ -52,7 +52,7 @@
     --color-accent-foreground: var(--accent-foreground);
 
     --color-destructive: var(--destructive);
-    --color-destructive-foreground: var(--destructive-foreground);
+    --color-income: var(--income);
 
     --color-border: var(--border);
     --color-input: var(--input);
@@ -91,14 +91,24 @@
     --muted-foreground: oklch(0.556 0 0);
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
-    /* Two roles, deliberately separate — see the dark block for why it matters:
-       --destructive is the SOLID SURFACE a destructive button fills with, and
-       --destructive-foreground is destructive TEXT on an ordinary surface
-       (`ui/alert`, `ui/dropdown-menu`, a ghost icon button).
-       In light mode one value serves both: white on it reads at 4.77:1, and it on
-       white reads at 4.77:1. */
+    /* Two roles, one token — see the dark block for how that is made to work:
+       the SOLID SURFACE a destructive button fills with, and destructive TEXT on an
+       ordinary surface (`ui/alert`, `ui/dropdown-menu`, a ghost icon button).
+       In light mode one value genuinely serves both: white on it reads at 4.77:1, and
+       it on white reads at 4.77:1. */
     --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.577 0.245 27.325);
+    /* Money moving IN. `text-destructive` is already the token for money moving out —
+       red text on an ordinary surface — and this is its counterpart, stepped to the same
+       contrast so the two read as a matched pair rather than as one shouting: #17843F on
+       white is 4.75:1 against --destructive's 4.76:1.
+
+       Red against green is the worst pair there is for colour-vision deficiency, and that
+       is deliberately not a problem here, because **the colour is never what says which
+       direction it is.** Every amount carries a `+` or a `-`, and the row names its type
+       in words. The colour only agrees with them. Read the ledger in greyscale and it
+       still parses; that is the test this pair has to pass, and the one a green/red
+       ledger without signs would fail. See docs/UI-UX-GUIDELINES.md section 4. */
+    --income: oklch(0.54 0.14 150);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
@@ -165,12 +175,15 @@
        and renders the token raw, so the palette had to do the darkening. Ours must
        not: 0.505 knocked back again lands on a muddy #693132.
 
-       --destructive-foreground is unused by these components (they say
-       `text-destructive`), and is kept for the ones ported from laravel-ms-ai-v2 in
-       Phase 6, which say `text-destructive-foreground`. It holds the light red, which
-       is what destructive text on a dark ground needs. */
+       There is no --destructive-foreground. It was kept through the early phases in case
+       the components ported from laravel-ms-ai-v2 needed it — that codebase writes
+       `text-destructive-foreground` — but the port is done and every one of them says
+       `text-destructive`, so a second token holding the identical value would have been
+       a token nothing reads. Write `text-destructive`. */
     --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.704 0.191 22.216);
+    /* Re-stepped for the dark card, not flipped from light: #20B46B on #171717 is
+       6.66:1, beside --destructive's 6.19:1. Same pairing, same reasoning as above. */
+    --income: oklch(0.68 0.16 155);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);

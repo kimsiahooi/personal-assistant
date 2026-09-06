@@ -105,7 +105,7 @@ final class RecordTransfer
             'account_id' => $accountId,
             'type' => TransactionType::Transfer,
             'amount' => $signedAmount,
-            'occurred_on' => $occurredAt,
+            'occurred_at' => $occurredAt,
             'note' => $note,
         ]);
 
