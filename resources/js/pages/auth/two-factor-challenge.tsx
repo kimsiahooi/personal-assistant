@@ -92,6 +92,7 @@ export default function TwoFactorChallenge() {
                                                     { length: OTP_MAX_LENGTH },
                                                     (_, index) => (
                                                         <InputOTPSlot
+                                                            // biome-ignore lint/suspicious/noArrayIndexKey: an OTP slot is positional — the index is its identity.
                                                             key={index}
                                                             index={index}
                                                         />
@@ -112,11 +113,11 @@ export default function TwoFactorChallenge() {
                                 Continue
                             </Button>
 
-                            <div className="text-muted-foreground text-center text-sm">
+                            <div className="text-center text-muted-foreground text-sm">
                                 <span>or you can </span>
                                 <button
                                     type="button"
-                                    className="text-foreground cursor-pointer underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
+                                    className="cursor-pointer text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                                     onClick={() =>
                                         toggleRecoveryMode(clearErrors)
                                     }

@@ -18,13 +18,16 @@ type Props = {
     errors: string[];
 };
 
+/** Stable keys for the loading skeleton: the rows have position, but no identity. */
+const SKELETON_ROWS = Array.from({ length: 8 }, (_, i) => `placeholder-${i}`);
+
 export default function TwoFactorRecoveryCodes({
     recoveryCodesList,
     fetchRecoveryCodes,
     errors,
 }: Props) {
     const [codesAreVisible, setCodesAreVisible] = useState<boolean>(false);
-    const codesSectionRef = useRef<HTMLDivElement | null>(null);
+    const codesSectionRef = useRef<HTMLUListElement | null>(null);
     const canRegenerateCodes = recoveryCodesList.length > 0 && codesAreVisible;
 
     const toggleCodesVisibility = useCallback(async () => {
@@ -65,7 +68,7 @@ export default function TwoFactorRecoveryCodes({
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex flex-col gap-3 select-none sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex select-none flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <Button
                         onClick={toggleCodesVisibility}
                         className="w-fit"
@@ -108,42 +111,31 @@ export default function TwoFactorRecoveryCodes({
                             <AlertError errors={errors} />
                         ) : (
                             <>
-                                <div
+                                <ul
                                     ref={codesSectionRef}
-                                    className="bg-muted grid gap-1 rounded-lg p-4 font-mono text-sm"
-                                    role="list"
+                                    className="grid gap-1 rounded-lg bg-muted p-4 font-mono text-sm"
                                     aria-label="Recovery codes"
+                                    aria-busy={!recoveryCodesList.length}
                                 >
-                                    {recoveryCodesList.length ? (
-                                        recoveryCodesList.map((code, index) => (
-                                            <div
-                                                key={index}
-                                                role="listitem"
-                                                className="select-text"
-                                            >
-                                                {code}
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div
-                                            className="space-y-2"
-                                            aria-label="Loading recovery codes"
-                                        >
-                                            {Array.from(
-                                                { length: 8 },
-                                                (_, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="bg-muted-foreground/20 h-4 animate-pulse rounded"
-                                                        aria-hidden="true"
-                                                    />
-                                                ),
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                                    {recoveryCodesList.length
+                                        ? recoveryCodesList.map((code) => (
+                                              <li
+                                                  key={code}
+                                                  className="select-text"
+                                              >
+                                                  {code}
+                                              </li>
+                                          ))
+                                        : SKELETON_ROWS.map((row) => (
+                                              <li
+                                                  key={row}
+                                                  className="h-4 animate-pulse rounded bg-muted-foreground/20"
+                                                  aria-hidden="true"
+                                              />
+                                          ))}
+                                </ul>
 
-                                <div className="text-muted-foreground text-xs select-none">
+                                <div className="select-none text-muted-foreground text-xs">
                                     <p id="regenerate-warning">
                                         Each recovery code can be used once to
                                         access your account and will be removed
